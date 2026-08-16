@@ -1,0 +1,43 @@
+tools:
+  - name: better-grep
+    command: python3 tools/better-grep/better_grep.py
+    description: Search repository code with ranked, bounded results.
+
+  - name: better-cat
+    command: python3 tools/better-cat/better_cat.py
+    description: Read bounded file ranges without unnecessary context.
+
+  - name: better-find
+    command: python3 tools/better-find/better_find.py
+    description: Find repository files with bounded, structured results.
+
+  - name: better-git
+    command: python3 tools/better-git/better_git.py
+    description: Inspect repository state, history, changes, conflicts, branches, stashes, tags, remotes, and PR context.
+
+    commands:
+      - status
+      - branch
+      - diff
+      - diff-summary
+      - changed
+      - recent
+      - log
+      - inspect
+      - show
+      - conflicts
+      - check
+      - context
+      - review
+      - review-branch
+      - commit-context
+      - fix-context
+      - merge-context
+      - rebase-context
+      - ship-context
+      - branch-context
+      - verify-context
+      - stash
+      - tag
+      - remote
+      - pr-context
