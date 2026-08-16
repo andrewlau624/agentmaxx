@@ -49,15 +49,48 @@ Never emit:
 
 Ask only when the answer changes what you build. Do not ask for permission, confirmation, or equivalent choices. Pick the obvious default and proceed.
 
+## Between tool calls
+
+Text written mid-task is the most expensive text you produce. Every turn's output is appended to context and then re-sent on **every** subsequent turn — a sentence written early is billed dozens of times, while the same sentence in your final answer is billed once. Measured: intermediate narration dominated cache-write cost.
+
+- Emit **no prose between tool calls** by default. The calls are already visible; announcing them duplicates information the user can see.
+- Do not state a plan before executing it, or summarize a result you are about to act on.
+- Write prose mid-task only to report a finding that changes the plan, or to ask a genuinely blocking question. One or two sentences.
+- Never write a transition ("Now let me check...", "Next I'll look at...", "Let me verify..."). Just make the call.
+
 ## Tool-use efficiency
 
+Round trips cost more than bytes. Each additional call re-sends the entire accumulated context, so one call returning three results beats three calls returning one each — even at identical total output.
+
+- **Batch by default.** Multiple file ranges, multiple patterns, and independent tool calls go in one call or one message.
+- Prefer one call that answers the question over a sequence that narrows toward it.
 - Grep before reading.
 - Read relevant ranges, not whole files, unless the file is <200 lines or its structure is unknown.
 - Never re-read an edit just to verify it; successful edits are sufficient.
-- Batch independent tool calls.
-- Delegate broad multi-file searches to subagents when useful.
+- Delegate broad multi-file searches to subagents when useful — the file dumps land in their context, not yours.
 - Narrow command output before returning it.
 - Use one search that covers the alternatives instead of several similar searches.
+
+### agentmaxx tools
+
+Installed at `{{TOOLS_ROOT}}`. Full signatures below — **never call `--help`**; a call spent learning an interface is pure overhead.
+
+| Tool | Invocation |
+|---|---|
+| better-context | `python3 {{TOOLS_ROOT}}/better-context/better_context.py QUERY [QUERY ...] [--path P] [--type EXT] [--max-hits N] [--context-lines N] [--max-output-chars N]` |
+| better-grep | `python3 {{TOOLS_ROOT}}/better-grep/better_grep.py QUERY [QUERY ...] [--path P] [--type EXT] [--max-results N] [--max-output-chars N]` |
+| better-cat | `python3 {{TOOLS_ROOT}}/better-cat/better_cat.py SPEC [SPEC ...] [--max-output-chars N]` where SPEC is `path`, `path:12-40`, `path:12-` or `path:12` |
+| better-find | `python3 {{TOOLS_ROOT}}/better-find/better_find.py [PATH] [--name GLOB] [--type f\|d] [--max-results N]` |
+| better-tree | `python3 {{TOOLS_ROOT}}/better-tree/better_tree.py [PATH] [--depth N] [--max-entries N] [--hidden] [--include-ignored]` |
+| better-blame | `python3 {{TOOLS_ROOT}}/better-blame/better_blame.py PATH [-L START,END] [-r REV] [--context N] [--max-lines N]` |
+| better-git | `python3 {{TOOLS_ROOT}}/better-git/better_git.py COMMAND [ARGS ...]` |
+| better-check | `python3 {{TOOLS_ROOT}}/better-check/better_check.py [--test CMD ...] [--lint CMD ...] [--typecheck CMD ...] [--build CMD ...] [--timeout N] [--max-output N] [--stop-on-failure] [--quiet]` |
+| better-lint | `python3 {{TOOLS_ROOT}}/better-lint/better_lint.py [--linter ruff\|flake8\|pylint\|eslint\|biome\|clippy\|go-vet] [--timeout N] [--max-output N] [--quiet] [COMMAND ...]` |
+| better-test | `python3 {{TOOLS_ROOT}}/better-test/better_test.py [--framework pytest\|unittest\|npm] [--command CMD] [--timeout N] [--max-output N] [--quiet]` |
+
+- **`better-context` is the default for "where is X and what does it look like"** — it searches and returns the surrounding source in one call, replacing grep-then-read.
+- Pass every pattern to one `better-grep` call and every range to one `better-cat` call rather than issuing them separately.
+- `better-git COMMAND` is one of: status, branch, diff, diff-summary, changed, recent, log, inspect, show, conflicts, check, context, review, review-branch, commit-context, fix-context, merge-context, rebase-context, ship-context, branch-context, verify-context, stash, tag, remote, pr-context.
 
 ## Correctness floor
 

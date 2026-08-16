@@ -1,20 +1,39 @@
 tools:
+  - name: better-context
+    script: better-context/better_context.py
+    description: Search and return the surrounding source in one call — locate + read, one round trip. Prefer this over better-grep followed by better-cat.
+    usage: better_context.py QUERY [QUERY ...] [--path PATH] [--type EXT] [--max-hits N] [--context-lines N] [--max-output-chars N]
+
   - name: better-grep
-    command: python3 tools/better-grep/better_grep.py
-    description: Search repository code with ranked, bounded results.
+    script: better-grep/better_grep.py
+    description: Search repository code with ranked, bounded results. Accepts multiple patterns in one call.
+    usage: better_grep.py QUERY [QUERY ...] [--path PATH] [--type EXT] [--max-results N] [--max-output-chars N]
 
   - name: better-cat
-    command: python3 tools/better-cat/better_cat.py
-    description: Read bounded file ranges without unnecessary context.
+    script: better-cat/better_cat.py
+    description: Read bounded file ranges without unnecessary context. Accepts multiple specs in one call.
+    usage: better_cat.py SPEC [SPEC ...] [--max-output-chars N]
+    spec_syntax: "path, path:12-40, path:12- or path:12"
 
   - name: better-find
-    command: python3 tools/better-find/better_find.py
-    description: Find repository files with bounded, structured results.
+    script: better-find/better_find.py
+    description: Find repository files with bounded, structured results, skipping generated/dependency directories.
+    usage: better_find.py [PATH] [--name GLOB] [--type f|d] [--max-results N]
+
+  - name: better-tree
+    script: better-tree/better_tree.py
+    description: Bounded directory tree, skipping generated/dependency directories by default.
+    usage: better_tree.py [PATH] [--depth N] [--max-entries N] [--hidden] [--include-ignored]
+
+  - name: better-blame
+    script: better-blame/better_blame.py
+    description: Compact git blame — one file, optional line range or revision.
+    usage: better_blame.py PATH [-L START,END] [-r REVISION] [--context N] [--max-lines N]
 
   - name: better-git
-    command: python3 tools/better-git/better_git.py
-    description: Inspect repository state, history, changes, conflicts, branches, stashes, tags, remotes, and PR context.
-
+    script: better-git/better_git.py
+    description: Repository state, history, diffs, conflicts, branches, stashes, tags, remotes, and PR context.
+    usage: better_git.py COMMAND [ARGS ...]
     commands:
       - status
       - branch
@@ -41,3 +60,18 @@ tools:
       - tag
       - remote
       - pr-context
+
+  - name: better-check
+    script: better-check/better_check.py
+    description: Compact project verification — runs test/lint/typecheck/build and reports structured results.
+    usage: better_check.py [--test CMD ...] [--lint CMD ...] [--typecheck CMD ...] [--build CMD ...] [--timeout N] [--max-output N] [--stop-on-failure] [--quiet]
+
+  - name: better-lint
+    script: better-lint/better_lint.py
+    description: Compact lint interface — auto-detects a linter or runs an explicit command.
+    usage: better_lint.py [--linter ruff|flake8|pylint|eslint|biome|clippy|go-vet] [--timeout N] [--max-output N] [--quiet] [COMMAND ...]
+
+  - name: better-test
+    script: better-test/better_test.py
+    description: Run tests with bounded, structured output.
+    usage: better_test.py [--framework pytest|unittest|npm] [--command CMD] [--timeout N] [--max-output N] [--quiet]

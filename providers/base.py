@@ -8,6 +8,7 @@ import shutil
 
 BLOCK_START = "<!-- agentmaxx:start -->"
 BLOCK_END = "<!-- agentmaxx:end -->"
+TOOLS_ROOT_PLACEHOLDER = "{{TOOLS_ROOT}}"
 
 
 class Provider(ABC):
@@ -29,8 +30,17 @@ class Provider(ABC):
 
     @property
     @abstractmethod
-    def rules_filename(self) -> str:
-        """The per-repo rules file this provider reads, e.g. CLAUDE.md."""
+    def local_rules_filename(self) -> str:
+        """This provider's personal, uncommitted per-repo rules file.
+
+        Deliberately not the shared file (CLAUDE.md / AGENTS.md): `init` is
+        a personal opt-in and must not change what teammates get.
+        """
+
+    @property
+    def tools_root(self) -> Path:
+        """Where install_global() puts the tools for this provider."""
+        return self.global_root / "agentmaxx" / "tools"
 
     def install_global(self) -> None:
         """Install skills and tools into this provider's global config.
@@ -42,15 +52,23 @@ class Provider(ABC):
         self.install_tools()
 
     def install_repo(self, repo_root: Path) -> None:
-        """Inject the output-contract template into one repo's rules file.
+        """Inject the output contract into one repo, for this user only.
 
-        Run from inside a project, e.g. `agentmaxx init`. Scoped to
-        `repo_root` only — never touches global provider config.
+        Writes the provider's personal rules file and excludes it via
+        .git/info/exclude, which is per-clone and untracked. Never edits
+        the shared rules file or .gitignore — both are committed, so
+        changing them would push this opt-in onto everyone else.
         """
-        self._inject_rules(repo_root / self.rules_filename)
+        self._inject_rules(repo_root / self.local_rules_filename)
+        self._exclude_locally(repo_root, self.local_rules_filename)
 
     def _inject_rules(self, destination: Path) -> None:
-        contract = (self.source_root / "templates" / "CLAUDE.md").read_text().rstrip("\n")
+        contract = (
+            (self.source_root / "templates" / "CLAUDE.md")
+            .read_text()
+            .replace(TOOLS_ROOT_PLACEHOLDER, str(self.tools_root))
+            .rstrip("\n")
+        )
         block = f"{BLOCK_START}\n{contract}\n{BLOCK_END}\n"
 
         existing = destination.read_text() if destination.exists() else ""
@@ -73,6 +91,29 @@ class Provider(ABC):
             destination.write_text(block)
 
         print(f"copy  {destination}")
+
+    def _exclude_locally(self, repo_root: Path, filename: str) -> None:
+        """Ignore `filename` for this clone only, via .git/info/exclude."""
+        git_dir = repo_root / ".git"
+
+        if not git_dir.is_dir():
+            return
+
+        exclude_path = git_dir / "info" / "exclude"
+        existing = (
+            exclude_path.read_text()
+            if exclude_path.exists()
+            else ""
+        )
+
+        if filename in existing.split():
+            return
+
+        exclude_path.parent.mkdir(parents=True, exist_ok=True)
+        separator = "" if not existing or existing.endswith("\n") else "\n"
+        exclude_path.write_text(f"{existing}{separator}{filename}\n")
+
+        print(f"ignore  {exclude_path} ({filename})")
 
     def install_skills(self) -> None:
         self._copy_directory(

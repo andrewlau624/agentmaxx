@@ -2,7 +2,32 @@
 
 import argparse
 import json
+import re
 from pathlib import Path
+
+
+RANGE_PATTERN = re.compile(r"^(\d+)(?:-(\d+)?)?$")
+
+
+def parse_spec(spec: str) -> tuple[str, int, int | None]:
+    """Parse `path`, `path:12-40`, `path:12-`, or `path:12`.
+
+    A trailing `:range` is only treated as a range when it actually looks
+    like one, so paths containing colons still resolve.
+    """
+    if ":" not in spec:
+        return spec, 1, None
+
+    path, _, candidate = spec.rpartition(":")
+    match = RANGE_PATTERN.match(candidate)
+
+    if not path or not match:
+        return spec, 1, None
+
+    start = int(match.group(1))
+    end = int(match.group(2)) if match.group(2) else None
+
+    return path, start, end
 
 
 def inspect(
@@ -60,22 +85,59 @@ def inspect(
     }
 
 
+def inspect_many(
+    specs: list[str],
+    max_output_chars: int = 8000,
+) -> dict:
+    """Inspect several file ranges in one call.
+
+    The output budget is shared across specs so that a batch costs the same
+    as a single read. Unused budget rolls forward to later specs.
+    """
+    if not specs:
+        raise ValueError("at least one file spec is required")
+
+    if max_output_chars < 1:
+        raise ValueError("max-output-chars must be greater than 0")
+
+    files = []
+    remaining = max_output_chars
+
+    for index, spec in enumerate(specs):
+        path, start, end = parse_spec(spec)
+        budget = max(1, remaining // (len(specs) - index))
+
+        entry = inspect(
+            path=path,
+            start=start,
+            end=end,
+            max_output_chars=budget,
+        )
+
+        files.append(entry)
+        remaining = max(1, remaining - len(entry["content"]))
+
+    return {
+        "files": files,
+        "truncated": any(entry["truncated"] for entry in files),
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Inspect a bounded range of a file."
+        description=(
+            "Inspect bounded file ranges. Accepts multiple specs in one "
+            "call: path, path:12-40, path:12- or path:12."
+        )
     )
-    parser.add_argument("path")
-    parser.add_argument("--start", type=int, default=1)
-    parser.add_argument("--end", type=int)
+    parser.add_argument("specs", nargs="+")
     parser.add_argument("--max-output-chars", type=int, default=8000)
 
     args = parser.parse_args()
 
     try:
-        output = inspect(
-            path=args.path,
-            start=args.start,
-            end=args.end,
+        output = inspect_many(
+            specs=args.specs,
             max_output_chars=args.max_output_chars,
         )
     except (ValueError, FileNotFoundError) as exc:

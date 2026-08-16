@@ -70,12 +70,22 @@ def score_match(query: str, match: dict) -> int:
 
 
 def search(
-    query: str,
+    query: str | list[str],
     path: str = ".",
     file_type: str | None = None,
     max_results: int = 20,
     max_output_chars: int = 8000,
 ) -> dict:
+    """Search for one or more patterns in a single ripgrep pass.
+
+    Passing several patterns costs one subprocess and one round trip
+    instead of one per pattern.
+    """
+    queries = [query] if isinstance(query, str) else list(query)
+
+    if not queries:
+        raise ValueError("at least one query is required")
+
     if max_results < 1:
         raise ValueError("max-results must be greater than 0")
 
@@ -91,7 +101,10 @@ def search(
     if file_type:
         command.extend(["--type", file_type])
 
-    command.extend([query, path])
+    for pattern in queries:
+        command.extend(["-e", pattern])
+
+    command.append(path)
 
     try:
         result = subprocess.run(
@@ -133,7 +146,10 @@ def search(
             "text": data["lines"]["text"].rstrip("\n"),
         }
 
-        match["_score"] = score_match(query, match)
+        match["_score"] = max(
+            score_match(pattern, match)
+            for pattern in queries
+        )
         matches.append(match)
 
     matches.sort(
@@ -165,7 +181,7 @@ def search(
             break
 
     return {
-        "query": query,
+        "queries": queries,
         "results": selected,
         "truncated": len(selected) < len(matches),
     }
@@ -174,12 +190,12 @@ def search(
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Search a repository and return compact "
-            "ranked results."
+            "Search a repository and return compact ranked results. "
+            "Accepts multiple patterns in one call."
         )
     )
 
-    parser.add_argument("query")
+    parser.add_argument("query", nargs="+")
     parser.add_argument("--path", default=".")
     parser.add_argument("--type", dest="file_type")
     parser.add_argument("--max-results", type=int, default=20)

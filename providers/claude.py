@@ -18,5 +18,5 @@ class ClaudeProvider(Provider):
         return Path.home() / ".claude"
 
     @property
-    def rules_filename(self) -> str:
-        return "CLAUDE.md"
+    def local_rules_filename(self) -> str:
+        return "CLAUDE.local.md"
