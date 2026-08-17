@@ -67,7 +67,6 @@ Round trips cost more than bytes. Each additional call re-sends the entire accum
 - Grep before reading.
 - Read relevant ranges, not whole files, unless the file is <200 lines or its structure is unknown.
 - Never re-read an edit just to verify it; successful edits are sufficient.
-- Delegate broad multi-file searches to subagents when useful — the file dumps land in their context, not yours.
 - Narrow command output before returning it.
 - Use one search that covers the alternatives instead of several similar searches.
 
@@ -80,6 +79,7 @@ Installed at `{{TOOLS_ROOT}}`. Full signatures below — **never call `--help`**
 | better-context | `python3 {{TOOLS_ROOT}}/better-context/better_context.py QUERY [QUERY ...] [--path P] [--type EXT] [--max-hits N] [--context-lines N] [--max-output-chars N]` |
 | better-grep | `python3 {{TOOLS_ROOT}}/better-grep/better_grep.py QUERY [QUERY ...] [--path P] [--type EXT] [--max-results N] [--max-output-chars N]` |
 | better-cat | `python3 {{TOOLS_ROOT}}/better-cat/better_cat.py SPEC [SPEC ...] [--max-output-chars N]` where SPEC is `path`, `path:12-40`, `path:12-` or `path:12` |
+| better-edit | `python3 {{TOOLS_ROOT}}/better-edit/better_edit.py [EDITS_JSON]` — JSON array of `{path, old, new, replace_all?}`, stdin if omitted |
 | better-find | `python3 {{TOOLS_ROOT}}/better-find/better_find.py [PATH] [--name GLOB] [--type f\|d] [--max-results N]` |
 | better-tree | `python3 {{TOOLS_ROOT}}/better-tree/better_tree.py [PATH] [--depth N] [--max-entries N] [--hidden] [--include-ignored]` |
 | better-blame | `python3 {{TOOLS_ROOT}}/better-blame/better_blame.py PATH [-L START,END] [-r REV] [--context N] [--max-lines N]` |
@@ -90,7 +90,18 @@ Installed at `{{TOOLS_ROOT}}`. Full signatures below — **never call `--help`**
 
 - **`better-context` is the default for "where is X and what does it look like"** — it searches and returns the surrounding source in one call, replacing grep-then-read.
 - Pass every pattern to one `better-grep` call and every range to one `better-cat` call rather than issuing them separately.
+- **Batch every edit of a change into one `better-edit` call**, across files too. It validates all edits before writing any, so a batch either lands whole or leaves the tree untouched.
 - `better-git COMMAND` is one of: status, branch, diff, diff-summary, changed, recent, log, inspect, show, conflicts, check, context, review, review-branch, commit-context, fix-context, merge-context, rebase-context, ship-context, branch-context, verify-context, stash, tag, remote, pr-context.
+
+## Delegation
+
+Context cost scales as **turns × prefix**: every byte resident in context is re-sent on every later call. A search that pulls 80KB of file content into the main thread does not cost 80KB — it costs 80KB times every turn that follows. This is usually the largest single line in a session.
+
+- **Delegate exploration.** Broad searches, investigations, audits, and "find out how X works" belong in a subagent. Its tool output stays in its context; only its answer enters yours.
+- **Delegate before exploring, not after.** Once file content is in the main thread, delegating later cannot undo the resend cost already committed.
+- **Ask for a conclusion, not a transcript.** Specify what to report — "return which module owns X, and the file:line that proves it" — rather than what to do. A subagent that returns its findings verbatim has moved no cost.
+- **Keep targeted work inline.** One grep, one known-file read, or a single edit is cheaper inline than the spawn plus task description a subagent costs.
+- Run independent subagents concurrently in one message rather than in sequence.
 
 ## Correctness floor
 

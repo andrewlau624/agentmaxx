@@ -35,6 +35,7 @@ file — `CLAUDE.local.md` for Claude, `AGENTS.override.md` for Codex — and ex
 | `templates/CLAUDE.md` | The injected output contract + tool reference |
 | `tools/` | The `better-*` CLI tools; `registry.yaml` is their source of truth |
 | `skills/` | Claude Code skills installed globally |
+| `evals/` | Weighted token-cost scorer for A/B testing changes; a dev utility, never installed or agent-facing |
 
 ## Why a tool matters as much as the prompt
 

@@ -63,6 +63,19 @@ class TestRegistryConsistency(unittest.TestCase):
                     (TOOLS_ROOT / name / f"test_{module}.py").is_file()
                 )
 
+    def test_every_tool_is_a_package(self):
+        """Without __init__.py, unittest silently skips the tool's tests.
+
+        A missing one does not fail anything — the suite just reports OK
+        with fewer tests than it should, which is worse than a failure.
+        """
+        for name in tool_directories():
+            with self.subTest(tool=name):
+                self.assertTrue(
+                    (TOOLS_ROOT / name / "__init__.py").is_file(),
+                    f"{name} is missing __init__.py; its tests will not run",
+                )
+
     def test_readmes_reference_real_script_paths(self):
         pattern = re.compile(r"python3 (tools/\S+\.py)")
 

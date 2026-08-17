@@ -15,6 +15,11 @@ tools:
     usage: better_cat.py SPEC [SPEC ...] [--max-output-chars N]
     spec_syntax: "path, path:12-40, path:12- or path:12"
 
+  - name: better-edit
+    script: better-edit/better_edit.py
+    description: Apply a batch of exact-string edits across one or more files in one call, all-or-nothing. Prefer this over one edit call per change.
+    usage: better_edit.py [EDITS_JSON] — JSON array of {path, old, new, replace_all?}; reads stdin if omitted
+
   - name: better-find
     script: better-find/better_find.py
     description: Find repository files with bounded, structured results, skipping generated/dependency directories.

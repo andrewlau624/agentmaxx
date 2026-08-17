@@ -31,3 +31,4 @@ install:
 
 test:
 	python3 -m unittest discover -s tools -p "test_*.py"
+	python3 -m unittest discover -s evals -p "test_*.py" -t .
