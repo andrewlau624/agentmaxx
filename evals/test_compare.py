@@ -64,6 +64,31 @@ class TestCompareArms(unittest.TestCase):
         self.assertEqual(result["control"]["output"], 200)
         self.assertEqual(result["control"]["turns"], 2)
 
+    def test_reports_cache_hit_rate_per_arm(self):
+        write_transcript(
+            self.control,
+            [
+                {
+                    "cache_creation_input_tokens": 100,
+                    "cache_read_input_tokens": 100,
+                }
+            ],
+        )
+        write_transcript(
+            self.treatment,
+            [
+                {
+                    "cache_creation_input_tokens": 100,
+                    "cache_read_input_tokens": 900,
+                }
+            ],
+        )
+
+        result = compare_arms([self.control], [self.treatment])
+
+        self.assertEqual(result["control"]["cache_hit_rate"], 0.5)
+        self.assertEqual(result["treatment"]["cache_hit_rate"], 0.9)
+
     def test_requires_both_arms_nonempty(self):
         write_transcript(self.control, [{"output_tokens": 1}])
 

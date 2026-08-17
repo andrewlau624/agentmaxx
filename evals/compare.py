@@ -42,5 +42,6 @@ def _summarize(usage: SessionUsage) -> dict:
         "cache_write": usage.cache_write,
         "cache_read": usage.cache_read,
         "output": usage.output,
+        "cache_hit_rate": round(usage.cache_hit_rate, 3),
         "weighted_cost": round(usage.weighted_cost, 1),
     }

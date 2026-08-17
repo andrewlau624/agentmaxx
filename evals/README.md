@@ -34,7 +34,26 @@ opposite result.
 
 ## Reading the output
 
-`cache_read` is the line that usually dominates, and it scales as
-`turns x prefix`. So a change helps only if it cuts one of those two: fewer round
-trips, or less content resident in context. A change that trims bytes per call
-but adds a call is a regression — this is what the index is for.
+Two lines matter more than the totals.
+
+**`weighted_cost`** is the comparison. A change helps only if it cuts round trips
+or content resident in context; trimming bytes per call while adding a call is a
+regression, which is what the index exists to catch.
+
+**`cache_hit_rate`** is `cache_read / (cache_read + cache_write)` — the share of
+the cacheable prefix served from cache instead of rewritten. Read it before
+trusting a `weighted_cost` delta, because it separates the two arms failing for
+different reasons from the change actually working:
+
+| Rate | Meaning |
+|---|---|
+| ~0.95 | Prefix stays warm; cost tracks what the agent does |
+| ~0.5 | Prefix is rewritten about as often as it is read |
+| ~0.0 | No cache reuse at all |
+
+The default cache TTL is 5 minutes. A session parked longer than that re-pays
+its entire prefix as both uncached input (1.0x) and a fresh write (1.25x) before
+any work happens — so a low rate means the session's *shape* is the cost, and no
+amount of tool-output trimming will move it. In the worst real session measured
+here, cache writes were 71% of weighted cost and uncached re-sends another 19%;
+cache reads were 7%. Compare arms only when their hit rates are close.

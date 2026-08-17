@@ -33,6 +33,20 @@ class SessionUsage:
     output: int
 
     @property
+    def cache_hit_rate(self) -> float:
+        """Share of cacheable prefix served from cache rather than rewritten.
+
+        A session that keeps its prefix warm reads it back many times per
+        write, so this sits near 1.0. It falls toward 0.5 when the prefix is
+        re-written about as often as it is read — the signature of a session
+        left idle past the cache TTL, where each return re-pays the whole
+        prefix. Cost then tracks session shape, not tool choice.
+        """
+        cacheable = self.cache_read + self.cache_write
+
+        return self.cache_read / cacheable if cacheable else 0.0
+
+    @property
     def weighted_cost(self) -> float:
         return (
             self.raw * COST_WEIGHTS["raw"]

@@ -105,6 +105,47 @@ class TestParseSession(unittest.TestCase):
         )
 
 
+class TestCacheHitRate(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.path = Path(self.temp_dir.name) / "session.jsonl"
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_warm_prefix_reads_far_more_than_it_writes(self):
+        write_transcript(
+            self.path,
+            [
+                {
+                    "cache_creation_input_tokens": 10_000,
+                    "cache_read_input_tokens": 190_000,
+                }
+            ],
+        )
+
+        self.assertEqual(parse_session(self.path).cache_hit_rate, 0.95)
+
+    def test_expired_prefix_rewrites_about_as_often_as_it_reads(self):
+        """The observed pathology: ~0.5 means the prefix keeps going cold."""
+        write_transcript(
+            self.path,
+            [
+                {
+                    "cache_creation_input_tokens": 123_600_000,
+                    "cache_read_input_tokens": 160_800_000,
+                }
+            ],
+        )
+
+        self.assertLess(parse_session(self.path).cache_hit_rate, 0.6)
+
+    def test_no_cache_traffic_is_zero_not_a_division_error(self):
+        write_transcript(self.path, [{"output_tokens": 10}])
+
+        self.assertEqual(parse_session(self.path).cache_hit_rate, 0.0)
+
+
 class TestAggregate(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
