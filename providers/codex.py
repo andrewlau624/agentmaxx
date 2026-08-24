@@ -18,5 +18,9 @@ class CodexProvider(Provider):
         return Path.home() / ".codex"
 
     @property
+    def global_rules_filename(self) -> str:
+        return "AGENTS.md"
+
+    @property
     def local_rules_filename(self) -> str:
         return "AGENTS.override.md"

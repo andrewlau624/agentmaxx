@@ -25,7 +25,7 @@ def _resolve_providers(provider_name: str | None) -> list:
     return detect_providers()
 
 
-def install_global(provider_name: str | None, force: bool) -> None:
+def install_global(provider_name: str | None) -> None:
     """Install skills and tools into every detected provider's global config."""
     providers = _resolve_providers(provider_name)
 
@@ -36,15 +36,12 @@ def install_global(provider_name: str | None, force: bool) -> None:
     for provider_type in providers:
         print(f"Installing agent maxx globally for {provider_type.name}")
 
-        provider_type(
-            source_root=ROOT,
-            force=force,
-        ).install_global()
+        provider_type(source_root=ROOT).install_global()
 
     print("agent maxx global installation complete.")
 
 
-def init(provider_name: str | None, force: bool) -> None:
+def init(provider_name: str | None) -> None:
     """Inject the output-contract template into the current repo's rules file."""
     providers = _resolve_providers(provider_name)
 
@@ -57,10 +54,7 @@ def init(provider_name: str | None, force: bool) -> None:
     for provider_type in providers:
         print(f"Initializing agent maxx for {provider_type.name} in {repo_root}")
 
-        provider_type(
-            source_root=ROOT,
-            force=force,
-        ).install_repo(repo_root)
+        provider_type(source_root=ROOT).install_repo(repo_root)
 
     print("agent maxx repo initialization complete.")
 
@@ -87,12 +81,6 @@ def main() -> None:
         help="Install for a specific provider.",
     )
 
-    install_parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Overwrite existing files.",
-    )
-
     init_parser = subparsers.add_parser(
         "init",
         help="Add the agent maxx output contract to the current repo.",
@@ -104,18 +92,12 @@ def main() -> None:
         help="Initialize a specific provider.",
     )
 
-    init_parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Overwrite an existing agent maxx block in this repo's rules file.",
-    )
-
     args = parser.parse_args()
 
     if args.command == "install":
-        install_global(args.provider, args.force)
+        install_global(args.provider)
     elif args.command == "init":
-        init(args.provider, args.force)
+        init(args.provider)
 
 
 if __name__ == "__main__":

@@ -14,9 +14,8 @@ TOOLS_ROOT_PLACEHOLDER = "{{TOOLS_ROOT}}"
 class Provider(ABC):
     name: str
 
-    def __init__(self, source_root: Path, force: bool = False):
+    def __init__(self, source_root: Path):
         self.source_root = source_root
-        self.force = force
 
     @classmethod
     @abstractmethod
@@ -27,6 +26,15 @@ class Provider(ABC):
     @abstractmethod
     def global_root(self) -> Path:
         """Where this provider's global config lives, e.g. ~/.claude."""
+
+    @property
+    @abstractmethod
+    def global_rules_filename(self) -> str:
+        """This provider's machine-wide rules file, inside `global_root`.
+
+        Not committed anywhere, so `install` owns it the same way it owns
+        the tools tree.
+        """
 
     @property
     @abstractmethod
@@ -43,11 +51,14 @@ class Provider(ABC):
         return self.global_root / "agentmaxx" / "tools"
 
     def install_global(self) -> None:
-        """Install skills and tools into this provider's global config.
+        """Install the contract, skills, and tools machine-wide.
 
-        Run once, e.g. from `make install`. Every repo on the machine picks
-        these up without further setup.
+        Re-run after any change to `templates/`, `tools/`, or `skills/`: all
+        three are derived from this repo, so install always overwrites. Every
+        repo on the machine picks the new version up without further setup —
+        `init` is only needed to scope the contract to a single repo.
         """
+        self._inject_rules(self.global_root / self.global_rules_filename)
         self.install_skills()
         self.install_tools()
 
@@ -74,21 +85,23 @@ class Provider(ABC):
         existing = destination.read_text() if destination.exists() else ""
 
         if BLOCK_START in existing:
-            if not self.force:
-                print(f"skip  {destination}")
-                return
-            existing = re.sub(
+            # The markers delimit the only part of this file agentmaxx owns,
+            # so refresh it in place. Anything outside them is the user's and
+            # survives untouched. A lambda replacement keeps re.sub from
+            # interpreting backslashes in the contract as group references.
+            updated = re.sub(
                 f"{re.escape(BLOCK_START)}.*?{re.escape(BLOCK_END)}\n?",
-                "",
+                lambda _: block,
                 existing,
                 flags=re.DOTALL,
             )
-
-        if existing.strip():
-            destination.write_text(existing.rstrip("\n") + "\n\n" + block)
+        elif existing.strip():
+            updated = existing.rstrip("\n") + "\n\n" + block
         else:
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_text(block)
+            updated = block
+
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(updated)
 
         print(f"copy  {destination}")
 
@@ -122,16 +135,16 @@ class Provider(ABC):
         )
 
     def install_tools(self) -> None:
+        # This directory is owned entirely by agentmaxx, so clearing it is
+        # what makes a deleted tool actually disappear from the install.
+        shutil.rmtree(self.tools_root, ignore_errors=True)
+
         self._copy_directory(
             self.source_root / "tools",
-            self.global_root / "agentmaxx" / "tools",
+            self.tools_root,
         )
 
     def _copy(self, source: Path, destination: Path) -> None:
-        if destination.exists() and not self.force:
-            print(f"skip  {destination}")
-            return
-
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
         print(f"copy  {destination}")

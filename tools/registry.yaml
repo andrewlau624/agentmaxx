@@ -1,4 +1,10 @@
 tools:
+  - name: better-explore
+    script: better-explore/better_explore.py
+    description: Repository code discovery agent. Finds candidate files for a task by searching, ranking by code relationships, and returning a prioritized reading list.
+    usage: better_explore.py TASK [--path PATH] [--num-candidates N] [--max-searches N]
+    note: "Reduces exploration-phase token cost. Returns ranked candidates with reasoning instead of undifferentiated search results."
+
   - name: better-context
     script: better-context/better_context.py
     description: Search and return the surrounding source in one call — locate + read, one round trip. Prefer this over better-grep followed by better-cat.
@@ -80,3 +86,51 @@ tools:
     script: better-test/better_test.py
     description: Run tests with bounded, structured output.
     usage: better_test.py [--framework pytest|unittest|npm] [--command CMD] [--timeout N] [--max-output N] [--quiet]
+
+  - name: better-symbol
+    script: better-symbol/better_symbol.py
+    description: Universal symbol finder. Locate definitions, usages, and implementations of classes, functions, types.
+    usage: better_symbol.py SYMBOL [--kind definition|usage|implementation] [--path PATH] [--max-results N]
+    note: "Finds where a symbol is defined and used without multiple grep passes. ~150-250 tokens savings per lookup."
+
+  - name: better-trace
+    script: better-trace/better_trace.py
+    description: Call graph tracer. Understand what calls a function and what it calls.
+    usage: better_trace.py FUNCTION [--direction callers|callees|both] [--depth N] [--path PATH] [--show-entry-points] [--max-results N]
+    note: "Returns call trees instead of manual tracing through imports. ~200-400 tokens savings per trace."
+
+  - name: better-related
+    script: better-related/better_related.py
+    description: File relationship mapper. Find imports, imported_by, tests, and dependents in one call.
+    usage: better_related.py FILE [--kind all|imports|imported_by|tests|dependents] [--path PATH] [--max-results N]
+    note: "Replaces 4-5 separate grep searches with one structured call. ~150-200 tokens savings."
+
+  - name: better-types
+    script: better-types/better_types.py
+    description: Type/interface signature extractor. Get type definitions without implementation.
+    usage: better_types.py TYPENAME [--kind all|class|interface|type|struct] [--path PATH]
+    note: "Extract type signatures without reading entire files. ~100-300 tokens savings per type."
+
+  - name: better-error
+    script: better-error/better_error.py
+    description: Exception parser. Extract actionable error context from stack traces.
+    usage: better_error.py [--file PATH | --content TEXT] < stacktrace.txt
+    note: "Parse tracebacks and return just the failing line and cause. ~50-150 tokens savings per error."
+
+  - name: better-diff
+    script: better-diff/better_diff.py
+    description: Ranked diff generator. Show what changed with minimal context.
+    usage: better_diff.py PATH [--since TIME] [--commits N] [--max-output CHARS]
+    note: "Generate ranked diffs with bounded output instead of massive git logs. ~100-200 tokens savings."
+
+  - name: better-contract
+    script: better-contract/better_contract.py
+    description: API contract extractor. Get routes, request/response types, and handlers.
+    usage: better_contract.py PATH [--format json|openapi]
+    note: "Extract API contracts from route files in one call. ~150-250 tokens savings per service."
+
+  - name: better-structure
+    script: better-structure/better_structure.py
+    description: Architecture graph generator. Show dependency tree, entry points, and layers.
+    usage: better_structure.py [--path PATH] [--max-depth N] [--show-cycles]
+    note: "Generate high-level architecture overview upfront. ~100-200 tokens savings per codebase analysis."

@@ -72,26 +72,129 @@ Round trips cost more than bytes. Each additional call re-sends the entire accum
 
 ### agentmaxx tools
 
+**Before exploring an unfamiliar repository, run `better-explore` with your task description.** It costs one tool call and eliminates dead-end investigation that would consume 10x more context.
+
 Installed at `{{TOOLS_ROOT}}`. Full signatures below — **never call `--help`**; a call spent learning an interface is pure overhead.
 
-| Tool | Invocation |
-|---|---|
-| better-context | `python3 {{TOOLS_ROOT}}/better-context/better_context.py QUERY [QUERY ...] [--path P] [--type EXT] [--max-hits N] [--context-lines N] [--max-output-chars N]` |
-| better-grep | `python3 {{TOOLS_ROOT}}/better-grep/better_grep.py QUERY [QUERY ...] [--path P] [--type EXT] [--max-results N] [--max-output-chars N]` |
-| better-cat | `python3 {{TOOLS_ROOT}}/better-cat/better_cat.py SPEC [SPEC ...] [--max-output-chars N]` where SPEC is `path`, `path:12-40`, `path:12-` or `path:12` |
-| better-edit | `python3 {{TOOLS_ROOT}}/better-edit/better_edit.py [EDITS_JSON]` — JSON array of `{path, old, new, replace_all?}`, stdin if omitted |
-| better-find | `python3 {{TOOLS_ROOT}}/better-find/better_find.py [PATH] [--name GLOB] [--type f\|d] [--max-results N]` |
-| better-tree | `python3 {{TOOLS_ROOT}}/better-tree/better_tree.py [PATH] [--depth N] [--max-entries N] [--hidden] [--include-ignored]` |
-| better-blame | `python3 {{TOOLS_ROOT}}/better-blame/better_blame.py PATH [-L START,END] [-r REV] [--context N] [--max-lines N]` |
-| better-git | `python3 {{TOOLS_ROOT}}/better-git/better_git.py COMMAND [ARGS ...]` |
-| better-check | `python3 {{TOOLS_ROOT}}/better-check/better_check.py [--test CMD ...] [--lint CMD ...] [--typecheck CMD ...] [--build CMD ...] [--timeout N] [--max-output N] [--stop-on-failure] [--quiet]` |
-| better-lint | `python3 {{TOOLS_ROOT}}/better-lint/better_lint.py [--linter ruff\|flake8\|pylint\|eslint\|biome\|clippy\|go-vet] [--timeout N] [--max-output N] [--quiet] [COMMAND ...]` |
-| better-test | `python3 {{TOOLS_ROOT}}/better-test/better_test.py [--framework pytest\|unittest\|npm] [--command CMD] [--timeout N] [--max-output N] [--quiet]` |
+| Tool | Purpose | Invocation |
+|---|---|---|
+| **better-explore** | Rank repository search results to guide exploration | `python3 {{TOOLS_ROOT}}/better-explore/better_explore.py TASK [--path PATH] [--num-candidates N] [--max-searches N]` |
+| **better-context** | Search and return surrounding source in one call | `python3 {{TOOLS_ROOT}}/better-context/better_context.py QUERY [QUERY ...] [--path P] [--type EXT] [--max-hits N] [--context-lines N] [--max-output-chars N]` |
+| **better-grep** | Search repository code with ranked results | `python3 {{TOOLS_ROOT}}/better-grep/better_grep.py QUERY [QUERY ...] [--path P] [--type EXT] [--max-results N] [--max-output-chars N]` |
+| **better-cat** | Read bounded file ranges without unnecessary context | `python3 {{TOOLS_ROOT}}/better-cat/better_cat.py SPEC [SPEC ...] [--max-output-chars N]` — spec: `path`, `path:12-40`, `path:12-`, or `path:12` |
+| **better-edit** | Apply batch of exact-string edits, all-or-nothing | `python3 {{TOOLS_ROOT}}/better-edit/better_edit.py [EDITS_JSON]` — JSON array of `{path, old, new, replace_all?}` or stdin |
+| **better-find** | Find files with bounded results | `python3 {{TOOLS_ROOT}}/better-find/better_find.py [PATH] [--name GLOB] [--type f\|d] [--max-results N]` |
+| **better-tree** | Bounded directory tree | `python3 {{TOOLS_ROOT}}/better-tree/better_tree.py [PATH] [--depth N] [--max-entries N] [--hidden] [--include-ignored]` |
+| **better-blame** | Compact git blame with optional line range | `python3 {{TOOLS_ROOT}}/better-blame/better_blame.py PATH [-L START,END] [-r REV] [--context N] [--max-lines N]` |
+| **better-git** | Repository state, history, diffs, branches, PRs | `python3 {{TOOLS_ROOT}}/better-git/better_git.py COMMAND [ARGS ...]` |
+| **better-check** | Compact project verification (test/lint/typecheck/build) | `python3 {{TOOLS_ROOT}}/better-check/better_check.py [--test CMD ...] [--lint CMD ...] [--typecheck CMD ...] [--build CMD ...] [--timeout N] [--max-output N] [--stop-on-failure] [--quiet]` |
+| **better-lint** | Compact lint interface (auto-detects linter) | `python3 {{TOOLS_ROOT}}/better-lint/better_lint.py [--linter ruff\|flake8\|pylint\|eslint\|biome\|clippy\|go-vet] [--timeout N] [--max-output N] [--quiet] [COMMAND ...]` |
+| **better-test** | Run tests with bounded, structured output | `python3 {{TOOLS_ROOT}}/better-test/better_test.py [--framework pytest\|unittest\|npm] [--command CMD] [--timeout N] [--max-output N] [--quiet]` |
+| **better-symbol** | Find symbol definitions, usages, and implementations | `python3 {{TOOLS_ROOT}}/better-symbol/better_symbol.py SYMBOL [--kind definition\|usage\|implementation] [--path P] [--max-results N]` |
+| **better-trace** | Call graph tracer (what calls this, what does this call) | `python3 {{TOOLS_ROOT}}/better-trace/better_trace.py FUNCTION [--direction callers\|callees\|both] [--depth N] [--path P] [--show-entry-points]` |
+| **better-related** | File relationships (imports, tests, dependents) | `python3 {{TOOLS_ROOT}}/better-related/better_related.py FILE [--kind all\|imports\|imported_by\|tests\|dependents] [--path P] [--max-results N]` |
+| **better-types** | Type/interface signature extractor | `python3 {{TOOLS_ROOT}}/better-types/better_types.py TYPENAME [--kind all\|class\|interface\|type\|struct] [--path P]` |
+| **better-error** | Exception parser (extract actionable error context) | `python3 {{TOOLS_ROOT}}/better-error/better_error.py [--file PATH \| --content TEXT]` |
+| **better-diff** | Ranked diff generator with bounded output | `python3 {{TOOLS_ROOT}}/better-diff/better_diff.py PATH [--since TIME \| --commits N] [--max-output CHARS]` |
+| **better-contract** | API contract extractor (routes, schemas, handlers) | `python3 {{TOOLS_ROOT}}/better-contract/better_contract.py PATH [--format json\|openapi]` |
+| **better-structure** | Architecture graph and dependency tree | `python3 {{TOOLS_ROOT}}/better-structure/better_structure.py [--path P] [--max-depth N] [--show-cycles]` |
 
-- **`better-context` is the default for "where is X and what does it look like"** — it searches and returns the surrounding source in one call, replacing grep-then-read.
-- Pass every pattern to one `better-grep` call and every range to one `better-cat` call rather than issuing them separately.
-- **Batch every edit of a change into one `better-edit` call**, across files too. It validates all edits before writing any, so a batch either lands whole or leaves the tree untouched.
-- `better-git COMMAND` is one of: status, branch, diff, diff-summary, changed, recent, log, inspect, show, conflicts, check, context, review, review-branch, commit-context, fix-context, merge-context, rebase-context, ship-context, branch-context, verify-context, stash, tag, remote, pr-context.
+### tool usage patterns
+
+**Exploration:** `better-explore` → `better-context` → read top results → discover relationships → search again
+
+**Code location:** `better-context` first (search + read in one call), then `better-grep` if you need multiple patterns or `better-cat` for specific ranges
+
+**Edits:** Batch all changes into one `better-edit` call across all files — it validates before writing, so either all succeed or all fail
+
+**Repository state:** `better-git` for history/conflicts/PR context; `better-blame` for line-level history
+
+**Verification:** `better-check` runs test/lint/typecheck/build in parallel with bounded output
+
+### why better-* tools exist
+
+Every VS Code agent tool call re-sends accumulated context. A grep-then-read sequence costs two round trips and re-sends context twice. `better-context` does both in one call. Similarly, separate edits require repeating the full context on each call; `better-edit` batches them.
+
+The net effect: **use better-* tools to minimize round trips and context re-sends, not because they are locally clever.**
+
+### exploration workflow
+
+Every task starts with a phase where you must discover which code matters. The workflow:
+
+**For specific tasks** ("Implement PAC-4611" with known files):
+
+```
+1. better-context TASK_KEYWORDS
+2. Read results
+3. Implement
+```
+
+**For vague tasks** ("Something broke with invitations"):
+
+```
+1. better-explore "What broke?"
+   → ranked candidates with reasoning
+   
+2. better-context top_candidate
+   → read the most likely file
+   
+3. Discover related imports/calls
+   → better-context NEW_KEYWORDS
+   
+4. Repeat 2-3 until you understand the issue
+   
+5. Implement the fix
+```
+
+**Key principle:** better-explore is specifically for *"I don't know where to start"*. Once you've identified a file, stop using better-explore and use better-context instead.
+
+### when to use each tool
+
+| Goal | Tool | Pattern |
+|---|---|---|
+| "I don't know where to start" | `better-explore` | `better-explore "task description"` |
+| "Find X and show me its code" | `better-context` | `better-context X` |
+| "Find multiple unrelated patterns" | `better-grep` | `better-grep QUERY1 QUERY2 QUERY3` |
+| "Read a specific file section" | `better-cat` | `better-cat path:10-40` |
+| "Make multiple changes" | `better-edit` | Batch all changes in one call |
+| "Check git history for a line" | `better-blame` | `better-blame path.py -L 10,20` |
+| "Understand repository state" | `better-git` | `better-git status\|diff\|log` |
+| "Run tests/lint/checks" | `better-check` | `better-check --test` |
+
+### why better-explore matters
+
+Normal agent exploration often looks like:
+
+```
+grep "invite" → 40 results
+  → read first result (wrong)
+  → read second result (wrong)
+  → read tenth result (finally right)
+```
+
+Every grep output and every file read consumes context. By the time you find the right file, you've burned 100k tokens on dead ends.
+
+`better-explore` eliminates dead ends:
+
+```
+better-explore "add invitations" 
+  → ranked: [service.py, invite/handler.py, webhooks.py]
+  → read service.py (right)
+```
+
+Same tokens, 10x faster.
+
+### discovery → implementation flow
+
+1. **Receive task** — understand scope and constraints
+2. **Run better-explore** (if starting cold) or **better-context** (if you know the area)
+3. **Read top result** — understand the existing pattern
+4. **Discover relationships** — what does it import/call/test?
+5. **Expand minimally** — read those connected pieces
+6. **Implement** — make the change
+7. **Verify** — run better-check to test/lint
+
+Stop after step 5. You're done when you understand enough to implement.
 
 ## Delegation
 

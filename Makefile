@@ -16,9 +16,11 @@ install:
 			exit 1; \
 		fi; \
 	}
+	@rm -rf "$(HOME)/.agentmaxx"
 	@mkdir -p "$(HOME)/.agentmaxx"
 	@cp -R agentmaxx.py providers skills templates tools \
 		"$(HOME)/.agentmaxx/"
+	@find "$(HOME)/.agentmaxx" -name __pycache__ -type d -prune -exec rm -rf {} +
 	@mkdir -p "$(HOME)/.local/bin"
 	@printf '%s\n' \
 		'#!/bin/sh' \
