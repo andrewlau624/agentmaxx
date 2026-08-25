@@ -1,6 +1,6 @@
 # agentmaxx
 
-Token-efficiency tooling for coding agents (Claude Code, Codex).
+Token-efficiency tooling for coding agents (Claude Code, Codex, OpenCode).
 
 An **agent navigation layer for codebases**: helps agents discover the minimum necessary code
 for a task instead of exploring blindly. Combines a strict output contract with ranked search,
@@ -18,9 +18,9 @@ with no per-repo step:
 
 | What | Where |
 |---|---|
-| Output contract | `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` (appended between markers) |
-| `better-*` tools | `~/.claude/agentmaxx/tools`, `~/.codex/agentmaxx/tools` |
-| Skills | `~/.claude/skills`, `~/.codex/skills` |
+| Output contract | `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.config/opencode/AGENTS.md` (appended between markers) |
+| `better-*` tools | `~/.claude/agentmaxx/tools`, `~/.codex/agentmaxx/tools`, `~/.config/opencode/agentmaxx/tools` |
+| Skills | `~/.claude/skills`, `~/.codex/skills`; opencode reuses `~/.claude/skills` (which it discovers natively) and copies only missing ones into `~/.config/opencode/skills` |
 
 Re-run it after changing `templates/`, `tools/`, or `skills/`: install always overwrites. Tools
 deleted here are removed from the install, and the contract is rewritten in place between its
@@ -38,7 +38,9 @@ one repo instead: it writes the same block into your own uncommitted rules file 
 `CLAUDE.local.md` for Claude, `AGENTS.override.md` for Codex — and excludes it via
 `.git/info/exclude` (per-clone, untracked). It never touches the repo's shared `CLAUDE.md` /
 `AGENTS.md` or its `.gitignore`, so it can't change what teammates get. Re-running it refreshes
-the block in place, same as `install`.
+the block in place, same as `install`. `init` skips opencode: its custom instruction
+files require entries in a committed `opencode.json`, which init never touches — its
+global install already covers every repo.
 
 ## Layout
 
@@ -69,7 +71,7 @@ See `tools/README.md` for the tool contract and `templates/CLAUDE.md` for the in
 
 ## Agent workflow
 
-When an agent (Claude Code, Codex) is installed with agentmaxx:
+When an agent (Claude Code, Codex, OpenCode) is installed with agentmaxx:
 
 1. Receives a task
 2. If the codebase is unfamiliar, runs `better-explore` to get ranked candidates

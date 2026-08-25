@@ -52,6 +52,13 @@ def init(provider_name: str | None) -> None:
     repo_root = Path.cwd()
 
     for provider_type in providers:
+        if not provider_type.supports_local_rules:
+            print(
+                f"skip  {provider_type.name}: no per-repo personal rules file; "
+                "global install covers every repo"
+            )
+            continue
+
         print(f"Initializing agent maxx for {provider_type.name} in {repo_root}")
 
         provider_type(source_root=ROOT).install_repo(repo_root)

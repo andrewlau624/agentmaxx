@@ -14,6 +14,12 @@ TOOLS_ROOT_PLACEHOLDER = "{{TOOLS_ROOT}}"
 class Provider(ABC):
     name: str
 
+    # Whether this provider auto-discovers a personal, uncommitted rules file
+    # inside a repo (local_rules_filename). False means install_repo() would
+    # create a file the agent never reads; the CLI skips init for such
+    # providers.
+    supports_local_rules: bool = True
+
     def __init__(self, source_root: Path):
         self.source_root = source_root
 
