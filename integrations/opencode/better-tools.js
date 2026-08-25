@@ -1,5 +1,7 @@
 import { tool } from "@opencode-ai/plugin"
 import { execFile } from "node:child_process"
+import { statSync } from "node:fs"
+import path from "node:path"
 
 const TOOLS_ROOT =
   process.env.AGENTMAXX_TOOLS_ROOT ??
@@ -36,6 +38,12 @@ const optStr = (description) =>
   tool.schema.string().describe(description).optional()
 const optInt = (description) =>
   tool.schema.number().int().describe(description).optional()
+
+// Unbounded reads are the dominant resident-byte source in long sessions:
+// a 56KB whole-file read re-bills on every subsequent turn. The before-hook
+// redirects oversized reads to ranged alternatives at the moment of choice.
+const READ_LIMIT_BYTES = 12 * 1024
+const sessionTurns = new Map()
 
 export const BetterToolsPlugin = async () => ({
   tool: {
@@ -141,6 +149,36 @@ export const BetterToolsPlugin = async () => ({
         return runPython("better-edit/better_edit.py", [args.edits], context.directory)
       },
     }),
+  },
+
+  "tool.execute.before": async (input, output) => {
+    const turns = (sessionTurns.get(input.sessionID) ?? 0) + 1
+    sessionTurns.set(input.sessionID, turns)
+
+    if (input.tool !== "read") return
+    const filePath = output.args?.filePath
+    if (!filePath) return
+
+    let stats
+    try {
+      stats = statSync(path.resolve(filePath))
+    } catch {
+      return
+    }
+    if (!stats.isFile() || stats.size <= READ_LIMIT_BYTES) return
+
+    const kb = Math.round(stats.size / 1024)
+    const lines = Math.round(stats.size / 42)
+    const tokens = Math.round(stats.size / 4)
+    const remainingTurns = Math.max(700 - turns, 100)
+    const tokEqCached = Math.round((tokens * remainingTurns * 0.1) / 1000)
+
+    throw new Error(
+      `[agentmaxx] ${kb}KB / ~${lines} lines — a whole-file read here re-bills ` +
+        `every remaining turn: ~${tokEqCached}K tok-eq by session end even at ` +
+        `cache rates. Read the relevant range instead: better_cat "${filePath}:start-end", ` +
+        `or re-issue read with explicit offset+limit.`,
+    )
   },
 
   "experimental.session.compacting": async (input, output) => {
