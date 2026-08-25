@@ -67,6 +67,15 @@ class Provider(ABC):
         self._inject_rules(self.global_root / self.global_rules_filename)
         self.install_skills()
         self.install_tools()
+        self.install_mcp()
+
+    def install_mcp(self) -> None:
+        """Register better-* as native MCP tools where the host supports it.
+
+        Default is a no-op; providers whose hosts read MCP configs override
+        this (claude: ~/.claude.json, codex: config.toml). opencode uses its
+        plugin system instead.
+        """
 
     def install_repo(self, repo_root: Path) -> None:
         """Inject the output contract into one repo, for this user only.
@@ -163,7 +172,8 @@ class Provider(ABC):
         if not source.exists():
             return
 
-        for path in source.rglob("*"):
+        # sorted(): deterministic copy order keeps installs reproducible.
+        for path in sorted(source.rglob("*")):
             if not path.is_file():
                 continue
 

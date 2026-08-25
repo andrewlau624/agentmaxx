@@ -1,0 +1,11 @@
+{
+  "servers": {
+    "graymatter": {
+      "args": [
+        "mcp",
+        "serve"
+      ],
+      "command": "graymatter"
+    }
+  }
+}

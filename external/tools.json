@@ -1,0 +1,12 @@
+[
+  {
+    "name": "graymatter",
+    "purpose": "Persistent agent memory MCP server (recall/remember across sessions)",
+    "check": "graymatter",
+    "install": {
+      "brew": ["brew", "install", "angelnicolasc/tap/graymatter"],
+      "go": ["go", "install", "github.com/angelnicolasc/graymatter/cmd/graymatter@latest"]
+    },
+    "wire": [["graymatter", "init"]]
+  }
+]

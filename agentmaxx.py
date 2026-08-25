@@ -38,6 +38,13 @@ def install_global(provider_name: str | None) -> None:
 
         provider_type(source_root=ROOT).install_global()
 
+    if provider_name is None:
+        skipped = sorted(
+            p.name for p in PROVIDERS.values() if p not in providers
+        )
+        if skipped:
+            print(f"skipped (not detected): {', '.join(skipped)}")
+
     print("agent maxx global installation complete.")
 
 

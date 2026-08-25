@@ -11,16 +11,20 @@ class OpenCodeProvider(Provider):
     name = "opencode"
     supports_local_rules = False
 
+    @staticmethod
+    def _config_root() -> Path:
+        xdg_config_home = os.environ.get("XDG_CONFIG_HOME")
+        base = Path(xdg_config_home) if xdg_config_home else Path.home() / ".config"
+        return base / "opencode"
+
     @classmethod
     def is_installed(cls) -> bool:
-        return shutil.which("opencode") is not None
+        return shutil.which("opencode") is not None or cls._config_root().is_dir()
 
     @property
     def global_root(self) -> Path:
         # Same resolution order opencode itself uses.
-        xdg_config_home = os.environ.get("XDG_CONFIG_HOME")
-        config_root = Path(xdg_config_home) if xdg_config_home else Path.home() / ".config"
-        return config_root / "opencode"
+        return self._config_root()
 
     @property
     def global_rules_filename(self) -> str:
@@ -43,6 +47,7 @@ class OpenCodeProvider(Provider):
         rules_path = self.global_root / self.global_rules_filename
         rules_existed = rules_path.exists()
         super().install_global()
+        self.install_plugin()
         claude_global = Path.home() / ".claude" / "CLAUDE.md"
         if not rules_existed and claude_global.exists():
             print(
@@ -50,6 +55,21 @@ class OpenCodeProvider(Provider):
                 f"{claude_global}; move over any non-agentmaxx global rules "
                 "you relied on"
             )
+
+    def install_plugin(self) -> None:
+        # Registered tools beat prose instructions: a plugin exposing better-*
+        # as native opencode tools raises adherence far above what the
+        # contract's bash-invocation table alone achieves.
+        plugin_src = (
+            self.source_root / "integrations" / "opencode" / "better-tools.js"
+        )
+        if not plugin_src.exists():
+            return
+
+        plugins_dir = self.global_root / "plugins"
+        plugins_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(plugin_src, plugins_dir / plugin_src.name)
+        print(f"copy  {plugins_dir / plugin_src.name}")
 
     def install_skills(self) -> None:
         # opencode discovers ~/.claude/skills natively and skill names must be
