@@ -14,11 +14,12 @@ import sys
 from pathlib import Path
 
 MANIFEST = Path(__file__).resolve().parent / "tools.json"
+REPO_ROOT = MANIFEST.parent.parent
 
 
 def run(cmd: list[str]) -> bool:
     print(f"run   {' '.join(cmd)}")
-    result = subprocess.run(cmd)
+    result = subprocess.run(cmd, cwd=REPO_ROOT)
     if result.returncode != 0:
         print(f"error {' '.join(cmd)} exited {result.returncode}")
         return False
