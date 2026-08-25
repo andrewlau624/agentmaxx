@@ -4,3 +4,9 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .venv/
+
+# graymatter runtime state (machine-local)
+.graymatter/gray.db
+.graymatter/daemon.log
+.graymatter/*.pid
+.graymatter/*.addr
