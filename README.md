@@ -1,10 +1,12 @@
 # agentmaxx
 
-Token-efficiency tooling for coding agents (Claude Code, Codex, OpenCode).
+Token-efficiency tooling for Claude Code, Codex, and OpenCode.
 
-An **agent navigation layer for codebases**: helps agents discover the minimum necessary code
-for a task instead of exploring blindly. Combines a strict output contract with ranked search,
-bounded output, and batch operations so agents spend fewer round trips and less context per task.
+Coding agents burn most of their budget the same way: grepping into dead ends, reading whole files, narrating every step — then re-sending all of it on every turn. agentmaxx attacks the three places that cost compounds:
+
+1. **A strict output contract**, injected into each provider's global rules. Verdict-first answers, capped verbosity, no mid-task narration.
+2. **Twenty `better-*` tools** — ranked search, bounded file reads, atomic batched edits, parallel checks — installed per provider *and* registered natively (MCP or plugin) so agents actually reach for them instead of falling back to raw grep.
+3. **Measurement** — one command reports real token spend across all three providers, so changes get judged on data instead of vibes.
 
 ## Install
 
@@ -12,72 +14,60 @@ bounded output, and batch operations so agents spend fewer round trips and less 
 make install
 ```
 
-This bootstraps the `agentmaxx` CLI to `~/.local/bin`, then installs into every detected
-provider's global config (`~/.claude`, `~/.codex`) — machine-wide, so every repo picks it up
-with no per-repo step:
+Stages everything to `~/.agentmaxx`, then wires every detected provider (by binary or config dir):
 
 | What | Where |
 |---|---|
-| Output contract | `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.config/opencode/AGENTS.md` (appended between markers) |
-| `better-*` tools | `~/.claude/agentmaxx/tools`, `~/.codex/agentmaxx/tools`, `~/.config/opencode/agentmaxx/tools` |
-| Skills | `~/.claude/skills`, `~/.codex/skills`; opencode reuses `~/.claude/skills` (which it discovers natively) and copies only missing ones into `~/.config/opencode/skills` |
+| Output contract | `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.config/opencode/AGENTS.md` |
+| Tools | `<provider config>/agentmaxx/tools` |
+| Skills | `~/.claude/skills`, `~/.codex/skills` |
+| Native tool registration | opencode plugin (`~/.config/opencode/plugins/better-tools.js`); MCP server for Claude Code (`~/.claude.json`) and Codex (`~/.codex/config.toml`) |
 
-Re-run it after changing `templates/`, `tools/`, or `skills/`: install always overwrites. Tools
-deleted here are removed from the install, and the contract is rewritten in place between its
-`agentmaxx:start` / `agentmaxx:end` markers, leaving your own instructions around it untouched.
+Restart your agents afterwards — hosts load plugins and MCP servers only at startup.
 
-## Use in a repo
+Re-run any time. Install overwrites its own blocks (delimited by `agentmaxx:start/end` markers) and leaves your own rules untouched; tools deleted from the repo disappear from the install too.
+
+## Extras
 
 ```bash
-cd your-project
-agentmaxx init
+make telemetry    # token spend per session/provider, cache hit rate, tool volume
+make prune        # remove unused gstack skills — their descriptions tax every request
+make test         # unit tests, including contract-stability guarantees
 ```
 
-`install` already covers every repo on the machine. `init` is only for scoping the contract to
-one repo instead: it writes the same block into your own uncommitted rules file —
-`CLAUDE.local.md` for Claude, `AGENTS.override.md` for Codex — and excludes it via
-`.git/info/exclude` (per-clone, untracked). It never touches the repo's shared `CLAUDE.md` /
-`AGENTS.md` or its `.gitignore`, so it can't change what teammates get. Re-running it refreshes
-the block in place, same as `install`. `init` skips opencode: its custom instruction
-files require entries in a committed `opencode.json`, which init never touches — its
-global install already covers every repo.
+`make install` also installs third-party tools listed in `external/tools.json` — currently [GrayMatter](https://github.com/angelnicolasc/graymatter) for persistent cross-session memory. Adding another tool is one JSON entry: name, install command, wire command.
+
+## Per-repo scoping
+
+The global install covers every repo automatically. To scope the contract to one repo instead:
+
+```bash
+cd your-project && agentmaxx init
+```
+
+Writes your personal rules file (`CLAUDE.local.md` / `AGENTS.override.md`), excludes it via `.git/info/exclude`, and never touches anything your teammates would see.
+
+## Why it works
+
+Context cost scales as **turns × context size**: every byte resident in a session is re-sent, and re-billed, on every subsequent turn. The levers:
+
+- **Bounded output** — never dump raw search results or entire files
+- **Batching** — one call with many patterns, files, or edits beats one call each
+- **Ranked discovery** — read the right file first instead of three wrong ones
+- **Stable prefixes** — deterministic generation keeps provider prompt caches warm (86% hit rate measured)
+
+Measured on real usage: fixed prompt overhead cut ~40% by compressing the contract and pruning dead skills; tool-result volume is the dominant remaining line item — exactly what the tools target.
 
 ## Layout
 
 | Path | What |
 |---|---|
-| `agentmaxx.py` | CLI: `install` (global) and `init` (per-repo) |
-| `providers/` | Per-agent-provider config: global root, personal rules filename |
-| `templates/CLAUDE.md` | The injected output contract + tool reference + exploration workflow |
-| `tools/` | The `better-*` CLI tools; `registry.yaml` is their source of truth |
-| `tools/better-explore/` | Discovery agent: ranks candidates to guide exploration (reduces dead-end investigation) |
-| `skills/` | Claude Code skills installed globally |
-| `skills/explore/` | Documentation for using better-explore in a task workflow |
-| `evals/` | Weighted token-cost scorer for A/B testing changes; a dev utility, never installed or agent-facing |
-
-## Why this matters
-
-Every agent round trip re-sends all accumulated context — the cost scales as **turns × context_size**, not just tokens.
-
-Prose caps (`CLAUDE.md`) cut visible output tokens. Mechanical efficiency (bounded tools, batching, exploration ranking) cuts context cost, which is often 3–5× larger than output cost.
-
-Three types of savings:
-
-1. **Bounded output** — never dump raw `rg` output or entire files
-2. **Batching** — one call with multiple patterns/files/edits instead of one call each
-3. **Ranked discovery** — `better-explore` eliminates dead-end investigation
-
-See `tools/README.md` for the tool contract and `templates/CLAUDE.md` for the injected rules.
-
-## Agent workflow
-
-When an agent (Claude Code, Codex, OpenCode) is installed with agentmaxx:
-
-1. Receives a task
-2. If the codebase is unfamiliar, runs `better-explore` to get ranked candidates
-3. Reads the top candidate with `better-context`
-4. Discovers imports/calls and narrows the scope
-5. Makes the change with `better-edit`
-6. Verifies with `better-check`
-
-The key shift: **ranked search + bounded output + batch operations** replaces **undifferentiated search + full file reads + one edit per change**.
+| `agentmaxx.py` | CLI: `install` (global), `init` (per-repo) |
+| `providers/` | Per-host config, detection, native tool registration |
+| `templates/CLAUDE.md` | The injected contract |
+| `tools/` | The `better-*` CLI tools |
+| `skills/` | Agent skills shipped everywhere |
+| `integrations/opencode/` | Plugin registering tools natively in opencode, plus compaction hook |
+| `mcp/` | MCP stdio server registering tools natively in Claude Code / Codex |
+| `external/` | Third-party tool manifest + installer, gstack skill pruner |
+| `evals/` | Telemetry and stability tests — dev-only, never installed |

@@ -1,24 +1,34 @@
 import { tool } from "@opencode-ai/plugin"
+import { execFile } from "node:child_process"
 
 const TOOLS_ROOT =
   process.env.AGENTMAXX_TOOLS_ROOT ??
   `${process.env.HOME}/.config/opencode/agentmaxx/tools`
 
-async function runPython(scriptPath, argv) {
-  const proc = Bun.spawn(["python3", `${TOOLS_ROOT}/${scriptPath}`, ...argv], {
-    stdout: "pipe",
-    stderr: "pipe",
-    cwd: process.cwd(),
+// execFile (node API) instead of Bun.spawn: opencode's plugin sandbox does
+// not expose the Bun global. Runs in the session directory so relative
+// paths in tool arguments resolve against the project.
+function runPython(scriptPath, argv, cwd) {
+  return new Promise((resolve) => {
+    execFile(
+      "python3",
+      [`${TOOLS_ROOT}/${scriptPath}`, ...argv],
+      { cwd, maxBuffer: 32 * 1024 * 1024 },
+      (error, stdout, stderr) => {
+        if (error && !stdout) {
+          resolve(
+            `exit ${error.code ?? "?"}: ${String(stderr).trim() || error.message}`,
+          )
+          return
+        }
+        if (error) {
+          resolve(`${stdout}\nexit ${error.code ?? "?"}: ${String(stderr).trim()}`)
+          return
+        }
+        resolve(stdout)
+      },
+    )
   })
-  const [stdout, stderr, code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ])
-  if (code !== 0) {
-    return `exit ${code}: ${stderr.trim() || "no stderr"}\n${stdout}`
-  }
-  return stdout
 }
 
 const str = (description) => tool.schema.string().describe(description)
@@ -34,12 +44,12 @@ export const BetterToolsPlugin = async () => ({
         "Search the repository and return matching source with surrounding context in ONE call. Prefer over grep-then-read sequences.",
       args: {
         query: str("one or more search keywords").array().min(1),
-        path: optStr("directory to search (default cwd)"),
+        path: optStr("directory to search (default session directory)"),
         max_hits: optInt("maximum number of matches"),
         context_lines: optInt("lines of surrounding context"),
         max_output_chars: optInt("output size cap"),
       },
-      async execute(args) {
+      async execute(args, context) {
         const argv = args.query.map(String)
         if (args.path) argv.push("--path", args.path)
         if (args.max_hits) argv.push("--max-hits", String(args.max_hits))
@@ -47,7 +57,7 @@ export const BetterToolsPlugin = async () => ({
           argv.push("--context-lines", String(args.context_lines))
         if (args.max_output_chars)
           argv.push("--max-output-chars", String(args.max_output_chars))
-        return runPython("better-context/better_context.py", argv)
+        return runPython("better-context/better_context.py", argv, context.directory)
       },
     }),
 
@@ -60,13 +70,13 @@ export const BetterToolsPlugin = async () => ({
         type: optStr("file extension filter, e.g. py or ts"),
         max_results: optInt("result cap"),
       },
-      async execute(args) {
+      async execute(args, context) {
         const argv = args.query.map(String)
         if (args.path) argv.push("--path", args.path)
         if (args.type) argv.push("--type", args.type)
         if (args.max_results)
           argv.push("--max-results", String(args.max_results))
-        return runPython("better-grep/better_grep.py", argv)
+        return runPython("better-grep/better_grep.py", argv, context.directory)
       },
     }),
 
@@ -77,27 +87,27 @@ export const BetterToolsPlugin = async () => ({
         spec: str("file specs").array().min(1),
         max_output_chars: optInt("output size cap"),
       },
-      async execute(args) {
+      async execute(args, context) {
         const argv = args.spec.map(String)
         if (args.max_output_chars)
           argv.push("--max-output-chars", String(args.max_output_chars))
-        return runPython("better-cat/better_cat.py", argv)
+        return runPython("better-cat/better_cat.py", argv, context.directory)
       },
     }),
 
     better_find: tool({
       description: "Find files by glob name pattern, bounded results.",
       args: {
-        path: optStr("directory to search (default cwd)"),
+        path: optStr("directory to search (default session directory)"),
         name: optStr("glob pattern, e.g. '*.py'"),
         type: optStr("'f' for files, 'd' for directories"),
       },
-      async execute(args) {
+      async execute(args, context) {
         const argv = []
         if (args.path) argv.push(args.path)
         if (args.name) argv.push("--name", args.name)
         if (args.type) argv.push("--type", args.type)
-        return runPython("better-find/better_find.py", argv)
+        return runPython("better-find/better_find.py", argv, context.directory)
       },
     }),
 
@@ -110,25 +120,25 @@ export const BetterToolsPlugin = async () => ({
         num_candidates: optInt("candidates to rank"),
         max_searches: optInt("search budget"),
       },
-      async execute(args) {
+      async execute(args, context) {
         const argv = [args.task]
         if (args.path) argv.push("--path", args.path)
         if (args.num_candidates)
           argv.push("--num-candidates", String(args.num_candidates))
         if (args.max_searches)
           argv.push("--max-searches", String(args.max_searches))
-        return runPython("better-explore/better_explore.py", argv)
+        return runPython("better-explore/better_explore.py", argv, context.directory)
       },
     }),
 
     better_edit: tool({
       description:
-        "Apply a batch of exact-string edits across files, all-or-nothing atomic. Pass a JSON array of {path, old, new, replace_all?}.",
+        "Apply a batch of exact-string edits across files, atomic (all succeed or nothing written). Pass a JSON array of {path, old, new, replace_all?}.",
       args: {
         edits: str("JSON array of {path, old, new, replace_all?} objects"),
       },
-      async execute(args) {
-        return runPython("better-edit/better_edit.py", [args.edits])
+      async execute(args, context) {
+        return runPython("better-edit/better_edit.py", [args.edits], context.directory)
       },
     }),
   },
