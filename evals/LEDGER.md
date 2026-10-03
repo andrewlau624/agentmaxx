@@ -224,16 +224,20 @@ Stop-rule count: iterations 4 and 5 shipped nothing measurable.
 
 ## Queue (expected % of bill x confidence / cost to test)
 
-1. Hard bench tasks where Haiku/Sonnet fail sometimes. Blocks every quality
-   question below (effort, compaction, subagents, verify gate).
-2. Effort / thinking budget vs pass rate (thinking ~18% of bill).
-3. Compact window live measurement and compaction quality (largest modeled
-   lever: doctor says 200k saves 22% here; quality unmeasured).
-4. Subagent prefix and model routing (each subagent pays its own prefix).
-5. No-AI-tells detector `evals/tells.py` (deterministic part is free to build).
-6. Fixed prefix audit with `/context` (prefix now p50 22k; smaller lever than
-   the seed assumed).
-7. Codex/opencode parity (verify keys first).
-8. Guard coverage gaps (security; replay for false positives).
+Remaining budget before the $40 pause: ~$10 after the regression run.
 
+1. Subagent share of the bill and subagent prefix size (free replay).
+2. Fixed prefix audit with `/context` (cheap; prefix p50 22k).
+3. Compact window live measurement and compaction quality (largest modeled
+   lever, doctor says 200k saves 22% here; long tasks are expensive to run,
+   needs budget).
+4. LLM-judge pass for tells with human references (regex floor on Sonnet).
+5. Opus effort batch (~$12; needs a go-ahead past the $40 cap).
+6. Harder tasks: more real fixes where Sonnet fails (only indexedset and
+   tzcast fail now).
+7. Prompt-injection scan of WebFetch/MCP output; `.claude/` supply-chain
+   check for fresh clones.
+
+Done: hard tasks (10 real), tells detector, guard gaps, Codex/opencode key
+verification, effort on Sonnet (negative), tells bench (floor).
 Dropped: read dedupe (0.0%). Deprioritized: Read/Web squeezing (1.7% total).
