@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import shutil
 from pathlib import Path
@@ -48,6 +49,7 @@ class OpenCodeProvider(Provider):
         rules_existed = rules_path.exists()
         super().install_global()
         self.install_plugin()
+        self.install_settings()
         claude_global = Path.home() / ".claude" / "CLAUDE.md"
         if not rules_existed and claude_global.exists():
             print(
@@ -55,6 +57,24 @@ class OpenCodeProvider(Provider):
                 f"{claude_global}; move over any non-agentmaxx global rules "
                 "you relied on"
             )
+
+    def install_settings(self) -> None:
+        # Same cap as the Claude squeeze hook: outputs over 8k bytes keep the
+        # tail and the full text goes to a file (opencode's default is 51200).
+        # Replay over 9,833 real Bash outputs: 23% less result volume.
+        config = self.global_root / "opencode.json"
+        try:
+            data = json.loads(config.read_text()) if config.exists() else {}
+        except json.JSONDecodeError:
+            print(f"skip  {config} isn't plain JSON; add \"tool_output\": {{\"max_bytes\": 8000}} by hand")
+            return
+        if "max_bytes" in data.get("tool_output", {}):
+            return
+        data.setdefault("$schema", "https://opencode.ai/config.json")
+        data.setdefault("tool_output", {})["max_bytes"] = 8000
+        config.parent.mkdir(parents=True, exist_ok=True)
+        config.write_text(json.dumps(data, indent=2) + "\n")
+        print(f"set   {config} tool_output.max_bytes=8000")
 
     def install_plugin(self) -> None:
         # Registered tools beat prose instructions: a plugin exposing better-*

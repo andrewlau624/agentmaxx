@@ -133,6 +133,26 @@ Not done: supply-chain scan of `.claude/` and `.mcp.json` in fresh clones
 (Claude Code's folder trust prompt covers the first launch; unclear what a
 hook adds), prompt-injection scanning of WebFetch/MCP output.
 
+## Iteration 3, part 4: Codex and opencode parity
+
+Keys verified by a subagent against Codex 0.142.5 and opencode 1.18.31
+(bad-typed configs, source, docs); details in `evals/parity-research.md`.
+
+Shipped: opencode `tool_output.max_bytes: 8000` (default 51200), merged into
+`~/.config/opencode/opencode.json` without overriding a user value. Same
+mechanism as squeeze (tail kept, full output to a file). Replay of the 8k
+tail cap on 9,833 real Bash outputs: 771 truncated, 23% less Bash result
+volume. Tested with a throwaway HOME.
+
+Not ported, with reasons. Codex `model_auto_compact_token_limit` is capped
+at 90% of a 272k window, so it already compacts near 245k and 300000 is a
+no-op. Codex tool search is always on. Codex `tool_output_token_limit`
+(default 10000) cuts the middle, saves nothing, and also hits file reads:
+park until a Codex bench exists. Codex hooks exist but need per-user approval
+in `/hooks`; a squeeze port is possible via PostToolUse `continue:false`,
+parked for the same reason. opencode has no Stop-equivalent that can block,
+so verify.py has no port.
+
 ## Queue (expected % of bill x confidence / cost to test)
 
 1. Hard bench tasks where Haiku/Sonnet fail sometimes. Blocks every quality
