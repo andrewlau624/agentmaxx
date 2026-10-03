@@ -6,7 +6,7 @@ last. Every number has the command that produced it.
 Cost is the weighted index: input 1, cache write 1.25 (5m) or 2 (1h), cache
 read 0.1, output 5.
 
-Bench spend so far: $0 (estimates are logged before each batch; actuals after).
+Bench spend so far: $8.67 (estimates are logged before each batch; actuals after).
 
 ## Iteration 1 (2026-10-03): price what sits in context
 
@@ -152,6 +152,28 @@ park until a Codex bench exists. Codex hooks exist but need per-user approval
 in `/hooks`; a squeeze port is possible via PostToolUse `continue:false`,
 parked for the same reason. opencode has no Stop-equivalent that can block,
 so verify.py has no port.
+
+## Iteration 3 result: calibration ($8.67 actual vs $5.50 estimated)
+
+`v2` arm on the 10 real tasks. Haiku 4.5: 17/20 pass, median ~$0.33/run,
+14-81 turns. Sonnet 5.5: 9/10, ~$0.10/run, 5-17 turns. Sonnet is ~3.5x
+cheaper per task than Haiku here because Haiku flails for 40+ turns.
+Failures: mistune-emphasis-mod3 (Haiku 1/2), mistune-list-directive-markers
+(Haiku 1/2), boltons-indexedset-slice-after-remove (Haiku 1/2, Sonnet 0/1).
+Checked the Sonnet indexedset failure by hand: its fix normalizes negative
+indexes but `x[-20:]` on a 9-item set still reaches `islice` with -11 and
+raises ValueError. A real bug, not a strict grader.
+
+So the real tasks separate models a little but Sonnet still passes 90%.
+Quality claims on Sonnet need either more reps on the 3 hard tasks or
+harder tasks; noted for the queue.
+
+## Iteration 4: effort level on Sonnet
+
+Hypothesis: `CLAUDE_CODE_EFFORT_LEVEL=low` (or medium) cuts weighted cost
+per task by >=15% at equal pass rate on the real tasks. Arms v2, v2_low,
+v2_medium (verified values: low|medium|high|xhigh), 3 reps each, Sonnet,
+10 real tasks. Estimate 80 runs x ~$0.11 = ~$9; cumulative ~$18.
 
 ## Queue (expected % of bill x confidence / cost to test)
 
