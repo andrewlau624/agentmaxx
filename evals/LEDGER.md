@@ -6,7 +6,7 @@ last. Every number has the command that produced it.
 Cost is the weighted index: input 1, cache write 1.25 (5m) or 2 (1h), cache
 read 0.1, output 5.
 
-Bench spend so far: $0.
+Bench spend so far: $0 (estimates are logged before each batch; actuals after).
 
 ## Iteration 1 (2026-10-03): price what sits in context
 
@@ -104,6 +104,19 @@ uses them (fastapi uses gitmoji: 369 of 400 hits came from it).
 
 Not yet known: model output density on the same detector. That comes from
 the generation tasks in the bench.
+
+## Iteration 3, part 2: hard tasks from real bug fixes
+
+10 tasks in `evals/bench/real/` (sqlparse, mistune, boltons; fixes from
+2022-2026), mined by a subagent and checked by `verify.py` plus a dry run of
+`run.py`'s grader with the reference fix applied: 10/10 fail without it and
+pass with it. `run.py` now runs repo tasks from a `git archive` of the parent
+commit with history re-initialized, discards agent edits to the hidden test
+files before applying them, and requires the full suite to pass.
+
+Calibration batch, estimate ~$5.50: arm `v2`, Haiku 4.5 x 2 reps and Sonnet
+5.5 x 1 rep on all 10 real tasks. Goal: find tasks and a model with pass
+rates between 20% and 80%.
 
 ## Queue (expected % of bill x confidence / cost to test)
 

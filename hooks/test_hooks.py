@@ -127,3 +127,61 @@ class TestLessons(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+tells_gate = load("tells_gate")
+
+
+class TestTellsGate(unittest.TestCase):
+    def run_hook(self, event):
+        import io, sys, tempfile, os
+        os.environ["AGENTMAXX_HOME"] = self.home
+        stdin, stdout = sys.stdin, sys.stdout
+        sys.stdin, sys.stdout = io.StringIO(json.dumps(event)), io.StringIO()
+        try:
+            tells_gate.main()
+            return sys.stdout.getvalue()
+        finally:
+            sys.stdin, sys.stdout = stdin, stdout
+
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.TemporaryDirectory()
+        self.home = self.tmp.name
+        tells_gate.STATE = pathlib.Path(self.home) / "tells"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_commit_message_extraction(self):
+        self.assertEqual(tells_gate.commit_message("git commit -qm 'fix tax'"), "fix tax")
+        self.assertEqual(tells_gate.commit_message("git add -A && git commit -m \"a\" -m \"b\""), "a\n\nb")
+        heredoc = "git commit -F - <<'EOF'\nThis commit adds x\nEOF"
+        self.assertEqual(tells_gate.commit_message(heredoc), "This commit adds x")
+        self.assertIsNone(tells_gate.commit_message("git status"))
+
+    def test_commit_denied_once(self):
+        event = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "session_id": "s", "cwd": self.home,
+                 "tool_input": {"command": "git commit -m 'This commit adds a robust, seamless parser'"}}
+        self.assertIn('"deny"', self.run_hook(event))
+        self.assertEqual(self.run_hook(event), "")
+        clean = {**event, "session_id": "t", "tool_input": {"command": "git commit -m 'parse dates in UTC'"}}
+        self.assertEqual(self.run_hook(clean), "")
+
+    def test_written_doc_flagged_once(self):
+        doc = pathlib.Path(self.home) / "README.md"
+        doc.write_text("Great question! This robust tool seamlessly leverages AI, highlighting the power.\n"
+                       "- **Fast:** yes\n- **Safe:** yes\nHope this helps!\n")
+        event = {"hook_event_name": "PostToolUse", "tool_name": "Write", "session_id": "s",
+                 "tool_input": {"file_path": str(doc), "content": doc.read_text()}}
+        out = self.run_hook(event)
+        self.assertIn('"block"', out)
+        self.assertIn("filler word", out)
+        self.assertEqual(self.run_hook(event), "")
+
+    def test_plain_doc_passes(self):
+        doc = pathlib.Path(self.home) / "NOTES.md"
+        doc.write_text("Tax is computed after the coupon. Totals round half-up to the cent.\n")
+        event = {"hook_event_name": "PostToolUse", "tool_name": "Write", "session_id": "s",
+                 "tool_input": {"file_path": str(doc), "content": doc.read_text()}}
+        self.assertEqual(self.run_hook(event), "")

@@ -28,6 +28,9 @@ def setup(arm, d):
     for src, dst in a.get("files", {}).items():
         dst = os.path.join(d, dst); os.makedirs(os.path.dirname(dst), exist_ok=True)
         open(dst, "w").write(fill(open(os.path.join(B, fill(src))).read()))
+    if a.get("skills"):
+        # what `make install` puts in ~/.claude/skills; bench runs don't load user skills
+        shutil.copytree(f"{AMX}/skills", f"{d}/.claude/skills", dirs_exist_ok=True)
     if a.get("mcp"):
         json.dump({"mcpServers": {"agentmaxx": {"command": "python3", "args": [f"{AMX}/mcp/better_mcp.py"]}}},
                   open(f"{d}/.mcp-arm.json", "w"))
@@ -69,8 +72,27 @@ def grade_real(t, d):
     failed, _ = pytest_failures(d, t, t.get("regress_tests", []))
     return not (failed - set(t.get("known_failures", [])))
 
+def tells_of(task, d):
+    """Score what a generation task produced; None when it produced nothing."""
+    import sys; sys.path.insert(0, os.path.dirname(B)); from tells import score
+    g = TASKS[task]["gen"]
+    if g.get("commit"):
+        text = subprocess.run("git log -1 --format=%B", shell=True, cwd=d, capture_output=True, text=True).stdout
+        if text.strip() == "arm":
+            return None
+    else:
+        path = os.path.join(d, g["file"])
+        if not os.path.exists(path):
+            return None
+        text = open(path, errors="ignore").read()
+        if g["file"] == "README.md":
+            text = text.split("Run tests with", 1)[-1]  # only what the agent added
+    return score(text, g["kind"])
+
 def grade(task, d, result_text):
     t = TASKS[task]
+    if "gen" in t and "hidden" not in t:
+        return tells_of(task, d) is not None
     if "repo" in t:
         return grade_real(t, d)
     if "answer" in t:
@@ -125,9 +147,11 @@ def one(arm, task, rep, model):
         tot["cr"] += u.get("cacheReadInputTokens", 0); tot["out"] += u.get("outputTokens", 0)
     tb, tools, peak = transcript_stats(j.get("session_id", "none"))
     ok = grade(task, d, j.get("result", ""))
+    tells = tells_of(task, d) if "gen" in TASKS[task] else None
     rec = dict(arm=arm, task=task, rep=rep, model=model, ok=ok, cost=j.get("total_cost_usd", 0), turns=j.get("num_turns"),
                secs=round(dt), tool_bytes=tb, peak_ctx=peak, tools=tools, err=j.get("is_error"), **tot,
-               wcost=tot["in"] + 1.25 * tot["cw"] + 0.1 * tot["cr"] + 5 * tot["out"], dir=d)
+               wcost=tot["in"] + 1.25 * tot["cw"] + 0.1 * tot["cr"] + 5 * tot["out"], dir=d,
+               **({"tells": tells["count"], "tells_density": tells["density"], "tells_hits": tells["hits"]} if tells else {}))
     with open(f"{B}/results.jsonl", "a") as fh: fh.write(json.dumps(rec) + "\n")
     print(arm, task, rep, "OK" if ok else "FAIL", f"${rec['cost']:.3f}", rec["turns"], "turns", flush=True)
     return rec

@@ -24,7 +24,7 @@ M = re.MULTILINE
 
 FILLER = (
     "delve|delves|delving|tapestry|testament|vibrant|realm|multifaceted|intricate|pivotal|bolster|foster|"
-    "seamless|seamlessly|robust|leverage|leveraging|elevate|elevates|empower|empowers|unleash|unlock|"
+    "seamless|seamlessly|robust|leveraging|leverages|leverage (?:the|our|your|their|its|this|these|existing|modern)|elevate|elevates|empower|empowers|unleash|unlock|"
     "game-changer|cutting-edge|best-in-class|supercharge|streamline|holistic|synergy|paradigm|"
     "meticulous|meticulously|commendable|showcase|showcasing|underscore|underscores|ever-evolving|"
     "embark|navigating the|in the realm of"

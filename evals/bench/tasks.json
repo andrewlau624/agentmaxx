@@ -22,5 +22,48 @@
  "t6_regions": {
   "prompt": "Make order regions strict and normalized in shopkit: an Order's region is normalized to uppercase with surrounding whitespace stripped when the order is created (including orders loaded from JSON by the store), and an unknown region (not in the tax rate table) raises ValueError at creation. `tax.rate_for` should raise ValueError for unknown regions instead of returning 0. Reports must show the normalized region.",
   "hidden": "test_t6.py"
+ },
+ "g1_readme": {
+  "prompt": "Write a 'Coupons' section for README.md explaining how coupons work in shopkit for someone integrating the library: the available codes, validity rules, and how the discount interacts with tax and totals.",
+  "gen": {
+   "file": "README.md",
+   "kind": "prose"
+  }
+ },
+ "g2_landing": {
+  "prompt": "Build a marketing landing page for shopkit as a single self-contained file site/index.html (inline CSS, no build step). Audience: Python developers who need order totals, tax and coupons without pulling in a framework.",
+  "gen": {
+   "file": "site/index.html",
+   "kind": "ui"
+  }
+ },
+ "g3_settings": {
+  "prompt": "Design the admin settings screen for a shopkit-backed store as a single self-contained file admin/settings.html (inline CSS and JS, no build step). It should let an operator edit regional tax rates, manage coupon codes (percent or amount off, minimum subtotal, expiry), and pick the default report format.",
+  "gen": {
+   "file": "admin/settings.html",
+   "kind": "ui"
+  }
+ },
+ "g4_adr": {
+  "prompt": "Write an architecture decision record at docs/adr/0001-money-representation.md for how shopkit represents and rounds money, based on what the code actually does.",
+  "gen": {
+   "file": "docs/adr/0001-money-representation.md",
+   "kind": "prose"
+  }
+ },
+ "g5_security": {
+  "prompt": "Do a security review of shopkit and write your findings to SECURITY_REVIEW.md. Only report what applies to this code.",
+  "gen": {
+   "file": "SECURITY_REVIEW.md",
+   "kind": "prose"
+  }
+ },
+ "g6_commit": {
+  "prompt": "Customers report that coupons don't reduce sales tax. Our policy: the coupon discount is applied to the taxable amount before tax is calculated (taxable amount can never go below zero). Fix shopkit so order totals follow this policy, then commit your change.",
+  "hidden": "test_t1.py",
+  "gen": {
+   "commit": true,
+   "kind": "commit"
+  }
  }
 }
