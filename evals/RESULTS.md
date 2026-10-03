@@ -49,12 +49,16 @@ first request changed the tool list, so the first two requests were full
 cache misses (36.6k and 41.9k tokens written, 0 read). The long contract
 alone also ate almost all of tool search's savings.
 
+Bootstrap 90% CIs on the cost ratio (resampling tasks, then reps; `python3
+evals/bench/analyze.py`, added later): `v2` −31% to −11%, `ts` −30% to −8%,
+`v1` +16% to +205%. These exclude zero.
+
 Same bench on Haiku 4.5, where mistakes happen:
 
 | Arm | Pass | Median $/task vs base |
 |---|---|---|
 | `base` | 17/18 (t1 failed after 30 turns) | — |
-| `v2` | **18/18** | **−11%** |
+| `v2` | **18/18** | −11% (90% CI −33% to +19%: not significant) |
 
 Hook firings across all v2 bench runs: the first verify gate (block on any
 failing test) fired 20 times, almost all on the fixture's pre-existing

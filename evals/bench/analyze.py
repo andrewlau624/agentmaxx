@@ -15,3 +15,21 @@ for a in arms:
 print()
 for t in tasks:
     print(t, "  ".join(f"{a}:{sum(x['ok'] for x in by[(a,t)])}/{len(by[(a,t)])} ${st.median(x['cost'] for x in by[(a,t)]):.3f}" for a in arms if by[(a,t)]))
+
+# Bootstrap 90% CI on the mean per-task cost ratio vs base: resample tasks, then reps within each task.
+import random
+TASKS_ONLY = os.environ.get("TASKS")
+def ci(arm, key="cost", n=2000, seed=1):
+    ts = [t for t in tasks if by[(arm, t)] and by[(base, t)] and (not TASKS_ONLY or t in TASKS_ONLY.split(","))]
+    rnd = random.Random(seed); stats = []
+    for _ in range(n):
+        pick = [rnd.choice(ts) for _ in ts]
+        stats.append(st.mean(st.median(rnd.choices([x[key] for x in by[(arm, t)]], k=len(by[(arm, t)])))
+                             / st.median(rnd.choices([x[key] for x in by[(base, t)]], k=len(by[(base, t)]))) for t in pick))
+    stats.sort()
+    return stats[int(.05 * n)] - 1, stats[int(.95 * n)] - 1
+if len(arms) > 1:
+    print("\nbootstrap 90% CI of cost vs", base, "(total_cost_usd / weighted index)")
+    for a in arms[1:]:
+        lo, hi = ci(a); wlo, whi = ci(a, "wcost")
+        print(f"  {a:10} [{lo:+.0%}, {hi:+.0%}]   [{wlo:+.0%}, {whi:+.0%}]")
