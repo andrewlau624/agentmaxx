@@ -175,6 +175,18 @@ per task by >=15% at equal pass rate on the real tasks. Arms v2, v2_low,
 v2_medium (verified values: low|medium|high|xhigh), 3 reps each, Sonnet,
 10 real tasks. Estimate 80 runs x ~$0.11 = ~$9; cumulative ~$18.
 
+## Iteration 5: tell density on generation tasks (runs alongside 4)
+
+Hypothesis: loading the skills (`v2s`) or the tells gate (`v2t`) lowers tell
+density on generated docs, UI and commit messages versus `v2` and `ts`,
+costing <=3% more per task. Tasks g1-g6 (README section, landing page,
+settings screen, ADR, security review, fix + commit) on the fixture, Sonnet,
+3 reps. Estimate 72 runs x ~$0.08 = ~$6; cumulative ~$24.
+
+Also added a bootstrap 90% CI to analyze.py. The published Haiku result
+(v2 -11%) has a CI of -33% to +19%, so it is not significant; RESULTS.md
+now says so. The Sonnet v2 result holds (-31% to -11%).
+
 ## Queue (expected % of bill x confidence / cost to test)
 
 1. Hard bench tasks where Haiku/Sonnet fail sometimes. Blocks every quality
