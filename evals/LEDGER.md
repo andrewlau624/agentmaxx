@@ -222,6 +222,25 @@ are at the floor for Sonnet.
 
 Stop-rule count: iterations 4 and 5 shipped nothing measurable.
 
+## Iteration 7: subagents (replay + two probes, $0.78)
+
+Replay, 14 days: subagents are 13.5% of the bill (136 sessions; 84% of that
+on Opus). First-request context p50 by type: fork 256k (inherits the
+parent, by design), general-purpose 65k, Explore 54k; main sessions 18k.
+
+Probe: `claude -p` with this machine's settings, one general-purpose
+subagent that replies "ok". Main 60k, subagent 53.5k. Same with
+`ENABLE_TOOL_SEARCH=true`: main 27k, subagent 20.9k. This machine's
+settings.json routes through a local proxy (`ANTHROPIC_BASE_URL`), which
+turns tool search off, so every MCP schema rides in each subagent's prefix.
+Replaying non-fork subagents with a 32.6k smaller prefix: 1.7% of the bill.
+`make install` already sets the variable and `doctor` already recommends
+it here, so nothing new to ship.
+
+Parked: routing subagents to a cheaper model (`CLAUDE_CODE_SUBAGENT_MODEL`)
+needs a bench where subagents do real work; the current tasks don't spawn
+any.
+
 ## Queue (expected % of bill x confidence / cost to test)
 
 Remaining budget before the $40 pause: ~$10 after the regression run.
