@@ -1,0 +1,256 @@
+{
+  "sqlparse-begin-end-semicolon": {
+    "repo": "https://github.com/andialbrecht/sqlparse.git",
+    "sha": "e92a032c81d51a6645b4f8c32470481894818ba0",
+    "fix_sha": "1a3bfbd50b82c05d9adcc51bacba059671dc1bc7",
+    "prompt": "sqlparse.split() cuts a statement apart at the semicolons inside a BEGIN ... END body. For example, splitting this SQL:\n\nWITH\nFUNCTION meaning_of_life()\n  RETURNS tinyint\n  BEGIN\n    DECLARE a tinyint DEFAULT CAST(6 as tinyint);\n    DECLARE b tinyint DEFAULT CAST(7 as tinyint);\n    RETURN a * b;\n  END\nSELECT meaning_of_life();\n\nreturns 4 pieces ('WITH ... DECLARE a tinyint DEFAULT CAST(6 as tinyint);', 'DECLARE b ...;', 'RETURN a * b;', 'END\\nSELECT meaning_of_life();'), but it is one statement and split() should return it as a single item. Please fix this without changing any other behavior.",
+    "hidden": "sqlparse-begin-end-semicolon/hidden.patch",
+    "fix": "sqlparse-begin-end-semicolon/fix.patch",
+    "hidden_tests": [
+      "tests/test_split.py::test_split_begin_end_semicolons"
+    ],
+    "hidden_guard_tests": [
+      "tests/test_split.py::test_split_begin_end_procedure"
+    ],
+    "regress_tests": [
+      "tests"
+    ],
+    "known_failures": [],
+    "pythonpath": ".",
+    "source_files": [
+      "sqlparse/engine/statement_splitter.py"
+    ],
+    "test_files": [
+      "tests/test_split.py"
+    ],
+    "difficulty_notes": "Statement splitter is a token-level state machine; must ignore ';' inside BEGIN...END while keeping 'BEGIN;' (transaction) splitting, which existing tests check."
+  },
+  "sqlparse-tzcast-whitespace": {
+    "repo": "https://github.com/andialbrecht/sqlparse.git",
+    "sha": "9d2cb6fc950386e9e59f29faf0d3742c4b12572c",
+    "fix_sha": "3d3df9dcfb68dc3680daa81ac0f747bb3703ad57",
+    "prompt": "sqlparse.format() with reindent=True drops a space when a function argument contains AT TIME ZONE: sqlparse.format(\"SELECT f(HOUR from bar AT TIME ZONE 'UTC') from foo\", reindent=True) returns \"SELECT f(HOUR\\n         frombar AT TIME ZONE 'UTC')\\nfrom foo\" (note 'frombar'), which is no longer valid SQL. Expected: \"SELECT f(HOUR\\n         from bar AT TIME ZONE 'UTC')\\nfrom foo\". Please fix this without changing any other behavior.",
+    "hidden": "sqlparse-tzcast-whitespace/hidden.patch",
+    "fix": "sqlparse-tzcast-whitespace/fix.patch",
+    "hidden_tests": [
+      "tests/test_regressions.py::test_issue562_tzcasts"
+    ],
+    "hidden_guard_tests": [],
+    "regress_tests": [
+      "tests"
+    ],
+    "known_failures": [],
+    "pythonpath": ".",
+    "source_files": [
+      "sqlparse/engine/grouping.py"
+    ],
+    "test_files": [
+      "tests/test_regressions.py"
+    ],
+    "difficulty_notes": "Symptom is in reindent output but the cause is an over-eager AT TIME ZONE grouping rule in engine/grouping.py that swallows the preceding whitespace; requires tracing format->grouping."
+  },
+  "sqlparse-strip-comments-hints": {
+    "repo": "https://github.com/andialbrecht/sqlparse.git",
+    "sha": "a2c7e642dc992d5b3972641144c4b05d6c6623ff",
+    "fix_sha": "af6df6c6627b5fcf98bc7bb46f780e1fa0d1a7ef",
+    "prompt": "sqlparse.format(sql, strip_comments=True) also removes optimizer hints, which changes what the query does. 'select --+full(u)' becomes 'select', 'SELECT /*+cluster(T)*/* FROM T_EEE T where A >:1' becomes 'SELECT  * FROM T_EEE T where A >:1', and 'insert /*+ DIRECT */ into sch.table_name as select * from foo' becomes 'insert   into sch.table_name as select * from foo'. Hints (--+, #+ and /*+ ... */) should be left exactly as written while ordinary comments are still stripped, e.g. 'select --+full(u)\\n--comment simple' should become 'select --+full(u)\\n'. Please fix this without changing any other behavior.",
+    "hidden": "sqlparse-strip-comments-hints/hidden.patch",
+    "fix": "sqlparse-strip-comments-hints/fix.patch",
+    "hidden_tests": [
+      "tests/test_format.py::TestFormat::test_strip_comments_multi",
+      "tests/test_format.py::TestFormat::test_strip_comments_single"
+    ],
+    "hidden_guard_tests": [],
+    "regress_tests": [
+      "tests"
+    ],
+    "known_failures": [],
+    "pythonpath": ".",
+    "source_files": [
+      "sqlparse/filters/others.py"
+    ],
+    "test_files": [
+      "tests/test_format.py"
+    ],
+    "difficulty_notes": "Lexer already tags hints with distinct subtypes; fix needs to skip hint tokens (incl. grouped Comment nodes) in the strip filter without an infinite loop over the same index."
+  },
+  "sqlparse-between-leading-dot-float": {
+    "repo": "https://github.com/andialbrecht/sqlparse.git",
+    "sha": "cd4c1b66cb0a148b40f742d435c527f27cf0a9fb",
+    "fix_sha": "a194d3187b04b0aed7a935c3401f068236fb6264",
+    "prompt": "sqlparse mis-parses BETWEEN when the bounds are floats written without a leading zero. sqlparse.parse('a BETWEEN .03 AND .06')[0] comes out with BETWEEN and AND as Name tokens, grouped into identifiers 'a BETWEEN' and '.03 AND', instead of keywords; with '0.03' and '0.06' it parses correctly. Expected: BETWEEN and AND are keyword tokens and '.03' and '.06' are standalone Float tokens (same for lowercase 'between ... and'). Dotted names such as 'select foo.bar', 'select foo . bar' and 'select a.b.c' must still be grouped as identifiers. Please fix this without changing any other behavior.",
+    "hidden": "sqlparse-between-leading-dot-float/hidden.patch",
+    "fix": "sqlparse-between-leading-dot-float/fix.patch",
+    "hidden_tests": [
+      "tests/test_regressions.py::test_between_leading_dot_float_issue601[a BETWEEN .03 AND .06]",
+      "tests/test_regressions.py::test_between_leading_dot_float_issue601[a between .03 and .06]"
+    ],
+    "hidden_guard_tests": [
+      "tests/test_regressions.py::test_keyword_before_qualified_name_still_grouped"
+    ],
+    "regress_tests": [
+      "tests"
+    ],
+    "known_failures": [],
+    "pythonpath": ".",
+    "source_files": [
+      "sqlparse/keywords.py"
+    ],
+    "test_files": [
+      "tests/test_regressions.py"
+    ],
+    "difficulty_notes": "Root cause is a lexer regex (word followed by '.') in keywords.py; must exclude a numeric literal after the dot while keeping 'schema . name' member access."
+  },
+  "mistune-emphasis-mod3": {
+    "repo": "https://github.com/lepture/mistune.git",
+    "sha": "90b1a733f0b0a8ac9bc653d8c7bec135c881fb81",
+    "fix_sha": "2d26bc8fc92ad270b97b4be77230985c160a7900",
+    "prompt": "mistune's emphasis handling disagrees with CommonMark on some runs of asterisks. mistune.html('*a***a*') returns '<p><em>a</em>**a*</p>\\n', but the CommonMark reference implementations (commonmark.js, markdown-it) produce '<p><em>a</em>*<em>a</em></p>\\n'. Likewise '*foo***bar*' gives '<p><em>foo</em>**bar*</p>\\n' instead of '<p><em>foo</em>*<em>bar</em></p>\\n'. Please make mistune match CommonMark here without changing any other behavior.",
+    "hidden": "mistune-emphasis-mod3/hidden.patch",
+    "fix": "mistune-emphasis-mod3/fix.patch",
+    "hidden_tests": [
+      "tests/test_syntax.py::TestSyntax::test_emphasis_005",
+      "tests/test_syntax.py::TestSyntax::test_emphasis_006"
+    ],
+    "hidden_guard_tests": [],
+    "regress_tests": [
+      "tests"
+    ],
+    "known_failures": [],
+    "pythonpath": "src",
+    "source_files": [
+      "src/mistune/inline_parser.py"
+    ],
+    "test_files": [
+      "tests/fixtures/fix-commonmark.txt"
+    ],
+    "difficulty_notes": "CommonMark rule-of-3 must use the original delimiter-run length, not the remaining length after partial consumption; deep in the delimiter algorithm."
+  },
+  "mistune-table-delimiter-row": {
+    "repo": "https://github.com/lepture/mistune.git",
+    "sha": "719107f8fbc01c07af5eb51822c6888122d56afc",
+    "fix_sha": "86f9fd1d7a1f56d8c7d40c805dab36f6dfdd2993",
+    "prompt": "With the table plugin enabled (mistune.create_markdown(plugins=['table'])), ordinary text that happens to contain pipes is turned into a table and a line of it disappears. Rendering 'Name | Age\\nJohn | 30\\nJane | 25\\n' produces a table with header Name/Age and a single body row Jane/25; the 'John | 30' line is silently lost. There is no ---- delimiter row, so this isn't a table: expected output is '<p>Name | Age\\nJohn | 30\\nJane | 25</p>\\n'. Please fix this without changing any other behavior; real tables must keep rendering as before.",
+    "hidden": "mistune-table-delimiter-row/hidden.patch",
+    "fix": "mistune-table-delimiter-row/fix.patch",
+    "hidden_tests": [
+      "tests/test_plugins.py::TestPlugin1_table::test_not_a_delimiter_row_001",
+      "tests/test_plugins.py::TestPlugin1_table::test_not_a_delimiter_row_002",
+      "tests/test_plugins.py::TestPlugin2_table::test_not_a_delimiter_row_001",
+      "tests/test_plugins.py::TestPlugin2_table::test_not_a_delimiter_row_002"
+    ],
+    "hidden_guard_tests": [],
+    "regress_tests": [
+      "tests"
+    ],
+    "known_failures": [],
+    "pythonpath": "src",
+    "source_files": [
+      "src/mistune/plugins/table.py"
+    ],
+    "test_files": [
+      "tests/fixtures/table.txt"
+    ],
+    "difficulty_notes": "Header/delimiter validation in the table plugin silently accepts any cell as no-align; must reject non-dash cells but still allow empty cells used by existing tables."
+  },
+  "mistune-list-directive-markers": {
+    "repo": "https://github.com/lepture/mistune.git",
+    "sha": "060f73ac87e8cf6d9e9b48f2df28c0654d845a4c",
+    "fix_sha": "03eacc5cf64df4f6f40864b852a62bc98c8e4c10",
+    "prompt": "With md = mistune.create_markdown(escape=False, plugins=[FencedDirective([Admonition()], markers=':')]) (from mistune.directives), a line with a single colon like ':{note}' is literal text at the top level (md(':{note}\\nlazy\\n') gives '<p>:{note}\\nlazy</p>'), but right after a '- ' bullet item it opens an admonition: md('- item\\n:{note}\\nlazy\\n') renders '<ul><li>item</li></ul>' followed by '<section class=\"admonition note\">...<p>lazy</p></section>'. A fenced directive needs at least three markers, so expected is no admonition and ':{note}' kept as text. A real ':::{note}' fence after a list item should still end the list and render the admonition. Please fix this without changing any other behavior.",
+    "hidden": "mistune-list-directive-markers/hidden.patch",
+    "fix": "mistune-list-directive-markers/fix.patch",
+    "hidden_tests": [
+      "tests/test_directives.py::TestFencedDirectiveInList::test_marker_run_below_fence_length_is_not_a_directive"
+    ],
+    "hidden_guard_tests": [
+      "tests/test_directives.py::TestFencedDirectiveInList::test_directive_still_breaks_a_list"
+    ],
+    "regress_tests": [
+      "tests"
+    ],
+    "known_failures": [],
+    "pythonpath": "src",
+    "source_files": [
+      "src/mistune/list_parser.py"
+    ],
+    "test_files": [
+      "tests/test_directives.py"
+    ],
+    "difficulty_notes": "Bug lives in list-item break-rule recompilation that string-replaces the first '3' in each regex, which hits a directive's '{3,}' quantifier; far from the directive code."
+  },
+  "mistune-footnote-block-backref": {
+    "repo": "https://github.com/lepture/mistune.git",
+    "sha": "7dda5f5d321608a7c906e167c1ee6f1110dd5802",
+    "fix_sha": "9b6220486d7591c3204c82edff4376bfe40fdc19",
+    "prompt": "With the footnotes plugin, a footnote whose body ends with something other than a paragraph produces broken HTML. mistune.create_markdown(plugins=['footnotes'])('paragraph [^fn]\\n[^fn]: *emph*\\n  > aaa\\n') renders the footnote item as '<li id=\"fn-1\"><p><em>emph</em></p>\\n<blockquote>\\n<p>aaa</p>\\n</blockqu<a href=\"#fnref-1\" class=\"footnote\">&#8617;</a></p></li>' -- the closing </blockquote> tag is chopped. Expected: '<li id=\"fn-1\"><p><em>emph</em></p>\\n<blockquote>\\n<p>aaa</p>\\n</blockquote>\\n<a href=\"#fnref-1\" class=\"footnote\">&#8617;</a></li>'. Footnotes that end in a paragraph should render exactly as they do now. Please fix this without changing any other behavior.",
+    "hidden": "mistune-footnote-block-backref/hidden.patch",
+    "fix": "mistune-footnote-block-backref/fix.patch",
+    "hidden_tests": [
+      "tests/test_plugins.py::TestPlugin1_footnotes::test_footnotes_008",
+      "tests/test_plugins.py::TestPlugin2_footnotes::test_footnotes_008"
+    ],
+    "hidden_guard_tests": [],
+    "regress_tests": [
+      "tests"
+    ],
+    "known_failures": [],
+    "pythonpath": "src",
+    "source_files": [
+      "src/mistune/plugins/footnotes.py"
+    ],
+    "test_files": [
+      "tests/fixtures/footnotes.txt"
+    ],
+    "difficulty_notes": "Back-reference insertion blindly strips 4 chars assuming the item ends with '</p>'; needs to handle block-ending items with exact expected HTML."
+  },
+  "boltons-indexedset-slice-after-remove": {
+    "repo": "https://github.com/mahmoud/boltons.git",
+    "sha": "979fa9b613fa8c0a455ae16ea6f2ec91c11ecafe",
+    "fix_sha": "609cabe932a1ea1423b24568644945abb1b8bb84",
+    "prompt": "boltons.setutils.IndexedSet returns the wrong elements when sliced after an item has been removed. x = IndexedSet(range(10)); x.pop(2); list(x) is [0, 1, 3, 4, 5, 6, 7, 8, 9] as expected, but list(x[1:4]) gives [1, 3, 4, 5] instead of [1, 3, 4], list(x[-3:]) gives [8, 9] instead of [7, 8, 9], and list(x[2:-1]) gives [4, 5, 6, 7, 8, 9] instead of [3, 4, 5, 6, 7, 8]. Slicing a set that has had removals should give exactly the same result as slicing a freshly built IndexedSet with the same contents, for any start/stop/step. Please fix this without changing any other behavior.",
+    "hidden": "boltons-indexedset-slice-after-remove/hidden.patch",
+    "fix": "boltons-indexedset-slice-after-remove/fix.patch",
+    "hidden_tests": [
+      "tests/test_setutils.py::test_iset_slice_after_removal",
+      "tests/test_setutils.py::test_iset_slice_agreement"
+    ],
+    "hidden_guard_tests": [],
+    "regress_tests": [
+      "tests"
+    ],
+    "known_failures": [],
+    "pythonpath": ".",
+    "source_files": [
+      "boltons/setutils.py"
+    ],
+    "test_files": [
+      "tests/test_setutils.py"
+    ],
+    "difficulty_notes": "Requires understanding IndexedSet's dead-slot bookkeeping: slice bounds are translated into item_list space but islice consumes the live stream; must preserve odd negative-step semantics."
+  },
+  "boltons-omd-copy": {
+    "repo": "https://github.com/mahmoud/boltons.git",
+    "sha": "bba729bf4539afc993a6410bdf8074b28707004a",
+    "fix_sha": "ebc7a8f776debfa33f0b380b57a444bca75a251b",
+    "prompt": "copy.copy() and copy.deepcopy() of a boltons OrderedMultiDict lose values. With o = OMD([('a', 1), ('a', 2), ('b', 3)]), copy.deepcopy(o).getlist('a') returns [2] instead of [1, 2], copy.copy(o).getlist('a') also returns [2], and the copies compare unequal to o. Pickling round-trips correctly. Both copies should keep every value, and a deepcopy must not share mutable values with the original. Please fix this without changing any other behavior.",
+    "hidden": "boltons-omd-copy/hidden.patch",
+    "fix": "boltons-omd-copy/fix.patch",
+    "hidden_tests": [
+      "tests/test_dictutils.py::test_omd_copy_module"
+    ],
+    "hidden_guard_tests": [],
+    "regress_tests": [
+      "tests"
+    ],
+    "known_failures": [],
+    "pythonpath": ".",
+    "source_files": [
+      "boltons/dictutils.py"
+    ],
+    "test_files": [
+      "tests/test_dictutils.py"
+    ],
+    "difficulty_notes": "dict subclass reduce protocol: inherited __reduce_ex__ replays dictitems via __setitem__ after __setstate__, collapsing multi-values; needs knowledge of copy/pickle internals."
+  }
+}

@@ -3,12 +3,12 @@
 Measured 2026-10-03 on Claude Code 2.1.288. Everything here is reproducible
 with the scripts in this directory. Two kinds of evidence:
 
-- **Bench**: real headless `claude -p` runs on `bench/fixture`, graded by
+- Bench: real headless `claude -p` runs on `bench/fixture`, graded by
   hidden tests the agent never sees. 6 tasks (bugfix, feature, noisy debug,
   read-only question, spec-heavy coupon stacking, cross-file validation),
   3 reps each, per-task medians, then averaged across tasks so every task
   weighs the same. Cost is `total_cost_usd` from the run's JSON.
-- **Replay**: 14 days of the author's real transcripts (339 sessions, ~10k
+- Replay: 14 days of the author's real transcripts (339 sessions, ~10k
   API requests), deduplicated per API response.
 
 ## Where the money goes (replay)
