@@ -118,6 +118,21 @@ Calibration batch, estimate ~$5.50: arm `v2`, Haiku 4.5 x 2 reps and Sonnet
 5.5 x 1 rep on all 10 real tasks. Goal: find tasks and a model with pass
 rates between 20% and 80%.
 
+## Iteration 3, part 3: guard gaps (while the calibration batch runs)
+
+Closed four gaps from the seed list: secrets printed by interpreter
+one-liners, environment dumps from one-liners, secrets files uploaded with
+curl `@file`, and git hook persistence. The guard split commands on `;`
+before tokenizing, which cut quoted one-liners in half, so one-liners are now
+checked on the whole command first. `evals/guard_replay.py` replays real
+calls: 14,846 calls over 30 days, 0.45% denied (was 0.47% on 14,350). The
+first one-liner rule flagged node scripts that read `.env` into a client
+config without printing it; it now requires the read to be printed.
+
+Not done: supply-chain scan of `.claude/` and `.mcp.json` in fresh clones
+(Claude Code's folder trust prompt covers the first launch; unclear what a
+hook adds), prompt-injection scanning of WebFetch/MCP output.
+
 ## Queue (expected % of bill x confidence / cost to test)
 
 1. Hard bench tasks where Haiku/Sonnet fail sometimes. Blocks every quality

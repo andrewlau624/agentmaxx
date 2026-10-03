@@ -147,7 +147,14 @@ heredoc bodies that merely mention `.env`, `rm -rf $SP/x` with SP set in the
 same command). After fixes: **0.47%**. Of those, 61 are reads like `cat .env`
 and `grep KEY .env` that printed live secrets into the transcript, which is
 what it should stop. 6 are `git reset --hard`, `git clean -f`, and one
-force-push. Push-to-main protection is opt-in (`AGENTMAXX_GUARD_PROTECT_MAIN=1`).
+force-push. Added 2026-10-03: one-liners that print a secrets file (`python3 -c
+"print(open('.env').read())"`, `node -e` likewise) or dump the environment,
+uploads of secrets files (`curl -d @.env`, `-F f=@~/.aws/credentials`),
+writes into `.git/hooks/` or `.husky/`, and `git config core.hooksPath`.
+A one-liner that reads `.env` into a client config without printing it is
+allowed; the first version flagged three of those. Replayed over 14,846 calls
+from 30 days (`python3 evals/guard_replay.py`): 0.45% denied, none of them
+from the new rules. Push-to-main protection is opt-in (`AGENTMAXX_GUARD_PROTECT_MAIN=1`).
 Verified live: under `bypassPermissions` the deny still holds and the model
 reports the reason.
 

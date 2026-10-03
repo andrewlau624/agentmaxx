@@ -38,6 +38,12 @@ NON_PRINTING = {
     "ls", "stat", "test", "[", "touch", "chmod", "chown", "rm", "mv", "cp", "ln", "rsync", "wc", "file",
     "source", ".", "realpath", "dirname", "basename", "echo", "printf", "mkdir",
 }
+ONE_LINER = re.compile(r"""\b(?:python[\d.]*|node|ruby|perl|php|deno|bun)\s+(?:-\w+\s+)*(?:-c|-e|-r|-E|--eval)\s+(['"])(.*?)\1""", re.S)
+PRINTED_READ = re.compile(r"\b(print|console\.log|puts|p|sys\.stdout\.write|process\.stdout\.write)\s*\(?\s*[^;\n]{0,60}"
+                          r"\b(open|readFileSync|read_text|read_bytes|File\.read|readFile)\s*\(")
+QUOTED = re.compile(r"""['"]([^'"\n]{1,200})['"]""")
+ENV_DUMP = re.compile(r"\b(print|pprint|json\.dumps|console\.log|JSON\.stringify|p|puts)\s*\(?\s*(dict\()?(os\.environ|process\.env|ENV)\s*\)?\s*\)?\s*(;|$|\n)")
+GIT_HOOKS = re.compile(r"(^|/)\.git/hooks/|\.husky/")
 # git subcommands that print file contents; the rest (commit -m "...env...", add, rm) don't.
 GIT_PRINTS = {"show", "diff", "log", "cat-file", "blame", "grep"}
 
@@ -83,6 +89,15 @@ def check_command(command: str) -> str | None:
         reason = check_command(inner[1])
         if reason:
             return reason
+    if re.search(r">>?\s*\S*\.git/hooks/\S+|\b(cp|mv|ln|install|tee)\b[^|;&]*\.git/hooks/", command):
+        return "git hooks run on every commit and survive the session; show the user the hook and let them install it"
+    # one-liners can hold ; and |, so check them before splitting into segments
+    for _, code in ONE_LINER.findall(command):
+        # reading .env into a client config is fine; printing what was read is the leak
+        if any(_is_secret_path(q) for q in QUOTED.findall(code)) and PRINTED_READ.search(code):
+            return "this one-liner reads a secrets file into the transcript; reference the variable name instead"
+        if ENV_DUMP.search(code):
+            return "dumping the environment would leak secrets into the transcript; print the one variable you need"
     for segment in SEGMENT_SPLIT.split(command):
         for piece in segment.split("|"):
             argv = _argv(piece)
@@ -109,6 +124,12 @@ def check_command(command: str) -> str | None:
                     return "git reset --hard discards uncommitted work; stash first or ask the user"
                 if sub[:1] == ["clean"] and "f" in flags:
                     return "git clean -f deletes untracked files permanently; list them with -n first"
+            # curl -d @.env / -F f=@.env / --data-binary @file upload a file's contents
+            if cmd in ("curl", "wget", "http", "xh") and any(_is_secret_path(re.sub(r"^[^@]*@", "", a)) for a in args if "@" in a):
+                return "this request would send a secrets file to a remote host"
+            if cmd == "git" and "config" in args and any(a.lower() == "core.hookspath" for a in args) and len(
+                    [a for a in args if not a.startswith("-")]) > 2:
+                return "changing core.hooksPath makes git run different code on every commit; ask the user first"
             counting = cmd in ("grep", "rg", "egrep") and any(a in ("-c", "-l", "-L", "-q", "--count", "--quiet") for a in args)
             git_quiet = cmd == "git" and not ({a for a in args if not a.startswith("-")} & GIT_PRINTS)
             if cmd not in NON_PRINTING and not counting and not git_quiet:
@@ -134,6 +155,8 @@ def check(tool: str, tool_input: dict) -> str | None:
         for edit in tool_input.get("edits") or []:
             text += edit.get("new_string", "")
         path = tool_input.get("file_path", "")
+        if GIT_HOOKS.search(path):
+            return "git hooks run on every commit and survive the session; show the user the hook and let them install it"
         if SECRET_VALUE.search(text) and not _is_secret_path(path):
             return "this write contains what looks like a live credential; load it from the environment instead"
     return None
