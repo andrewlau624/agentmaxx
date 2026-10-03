@@ -15,9 +15,13 @@ with the scripts in this directory. Two kinds of evidence:
 
 | Line | Share of weighted cost |
 |---|---|
-| Cache reads | 65% |
-| Cache writes | 24% |
-| Output | 11% |
+| Cache reads | 58% |
+| Cache writes | 32% |
+| Output | 10% |
+
+Corrected 2026-10-03: the first version priced every cache write at 1.25x, but
+79% of writes here use the 1h TTL, billed at 2x (`python3 evals/doctor.py`,
+550 sessions over 14 days). The earlier split was 65/24/11.
 
 The median request carried **266k tokens** of context; 66% of requests ran
 above 200k. Sessions started with a **~86k-token fixed prefix** (tool
@@ -79,6 +83,34 @@ Quality is not simulated. The research says smaller context helps (Chroma
 "context rot", lost-in-the-middle; Anthropic's context editing +29%), but
 each compaction can drop detail, which is why the default is 300k, not 200k.
 
+## What sits in context (replay)
+
+`python3 evals/residency.py --days 14`. A tool result's cost is its tokens
+times the requests it stays resident for, at read price, until the next
+compaction.
+
+| Source | Share of weighted bill |
+|---|---|
+| All tool results | 10.2% |
+| Bash | 8.1% |
+| WebSearch | 0.8% |
+| Read | 0.8% |
+| WebFetch | 0.1% |
+
+Repeat Reads of an unchanged file and range: 26 of 618 (4%), 0.0% of the
+bill. A read-dedupe hook is not worth building.
+
+## Cache TTL (replay)
+
+`CLAUDE_CODE_PROMPT_CACHE_TTL` takes `5m` or `1h` (checked in the 2.1.288
+binary; unset means 1h on a subscription, 5m on an API key or cloud
+provider). Replaying the real gaps between requests: 10,791 under 5 minutes,
+369 between 5 minutes and an hour, 75 over an hour. Forcing 5m would rewrite
+the whole context on each of the 369 and cost **+19%** despite cheaper writes.
+`doctor` runs this replay on your own transcripts and recommends switching
+only when the other TTL is more than 3% cheaper. Rewrites after more than an
+hour idle cost 7.0% of the bill, and no TTL setting avoids them.
+
 ## Bash output squeezer (replay)
 
 `hooks/squeeze.py` replayed over 8,829 real Bash outputs: it touched the 8.3%
@@ -133,6 +165,6 @@ correction nudge, as one imperative line.
   double-counting telemetry; disregard them.
 - Terse-output contracts: external A/B (JetBrains, 86 tasks) found −8.5%;
   RTK-style command rewriting found +7.6% cost. Not re-tested here.
-- Haiku subagents and 1h cache TTL: plausible, not benchmarked.
+- Haiku subagents: plausible, not benchmarked.
 - n=3 per cell. Differences under ~10% on a single task are noise; the
   across-task averages above are the claim.
