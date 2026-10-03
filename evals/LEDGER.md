@@ -6,7 +6,7 @@ last. Every number has the command that produced it.
 Cost is the weighted index: input 1, cache write 1.25 (5m) or 2 (1h), cache
 read 0.1, output 5.
 
-Bench spend so far: $8.67 (estimates are logged before each batch; actuals after).
+Bench spend so far: $17.32 + the tells batch (estimates are logged before each batch; actuals after).
 
 ## Iteration 1 (2026-10-03): price what sits in context
 
@@ -174,6 +174,16 @@ Hypothesis: `CLAUDE_CODE_EFFORT_LEVEL=low` (or medium) cuts weighted cost
 per task by >=15% at equal pass rate on the real tasks. Arms v2, v2_low,
 v2_medium (verified values: low|medium|high|xhigh), 3 reps each, Sonnet,
 10 real tasks. Estimate 80 runs x ~$0.11 = ~$9; cumulative ~$18.
+
+Result ($8.65 actual): no effect. Pass 26/30 in every arm (same tasks
+fail: indexedset, tzcast). Cost vs v2, 90% CI: low -9% to +8%, medium -7%
+to +9%. Hidden (thinking) share of output from the run transcripts: low 59%,
+default 61%, medium 62%, so the setting barely changes how much Sonnet 5.5
+thinks in agentic -p runs. A one-shot probe (digit-sum count) gave 199 vs
+239 output tokens at low vs xhigh on Sonnet and 91 vs 171 on Opus, all
+correct. Decision: park. The 18% thinking share was measured on interactive
+Opus sessions; an Opus effort batch (~$12) would push spend near the $40
+cap, so it waits for a go-ahead.
 
 ## Iteration 5: tell density on generation tasks (runs alongside 4)
 

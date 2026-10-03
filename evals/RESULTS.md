@@ -132,6 +132,14 @@ the whole context on each of the 369 and cost **+19%** despite cheaper writes.
 only when the other TTL is more than 3% cheaper. Rewrites after more than an
 hour idle cost 7.0% of the bill, and no TTL setting avoids them.
 
+## Effort level (bench, negative)
+
+Sonnet 5.5, `v2` arm, 10 real-repo tasks x 3 reps per arm.
+`CLAUDE_CODE_EFFORT_LEVEL=low` and `medium` vs unset: pass 26/30 in all
+three; cost 90% CI −9% to +8% (low) and −7% to +9% (medium). Thinking
+stayed ~60% of output in every arm. Not a lever for Sonnet in headless
+runs. Opus is untested.
+
 ## Bash output squeezer (replay)
 
 `hooks/squeeze.py` replayed over 8,829 real Bash outputs: it touched the 8.3%
