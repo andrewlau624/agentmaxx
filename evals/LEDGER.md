@@ -42,22 +42,48 @@ Decision: ship `evals/residency.py`, doctor TTL check and 1h pricing, tests in
 `evals/test_residency.py`. Bug found by the test: Edits didn't clear ranged
 Reads, which doubled the repeat count (8% -> 4%).
 
-## Open questions this raised
+## Iteration 2 (2026-10-03): what cache reads are made of
 
-- Tool results are 10% of the bill but the median request is 229k tokens with
-  a 22k prefix. What is the other ~80% of resident context? Candidates:
-  Write/Edit inputs (file bodies in tool_use), assistant text, thinking,
-  user pastes, injected hook/system reminders. Measure next.
+Picked because iteration 1 left 80% of resident context unexplained, and the
+answer decides whether anything besides compaction moves the 58% read line.
+
+Method: attribute each request's context growth from usage deltas.
+Thinking is stored with an empty body in transcripts, so hidden output =
+`output_tokens` minus visible text and tool input (chars / 3.6). The model
+reproduces 104% of actual cache-read tokens on main sessions, so the
+accounting closes.
+
+- **Prior thinking stays in context.** On 549 turns with >2k hidden output,
+  548 grew the next request by billed output, not visible output. The 2.1.288
+  binary sends `context_management.edits: [{type: "clear_thinking_20251015",
+  keep: "all"}]`, hardcoded. No setting clears old thinking.
+- **Composition of cache reads** (`python3 evals/residency.py`, all sessions
+  incl. subagents): tool results, prompts and injections 34.5%; prefix
+  (system, tools, post-compact summary) 29.9%; thinking 21.1%; visible
+  assistant text and tool calls 14.5%.
+- **Thinking is ~18% of the bill**: 58% of billed output is hidden (5.8% of
+  the bill as output) plus 21% of reads (12% of the bill as residency).
+  The levers are `CLAUDE_CODE_EFFORT_LEVEL`, `MAX_THINKING_TOKENS`,
+  `CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING` (names verified in the binary,
+  semantics not yet). Every one trades quality, so it needs a bench where
+  quality can drop.
+- **Bash tool inputs are as resident as Bash outputs** (char count: 10.9% vs
+  12.4% of reads). Mostly heredocs writing files or scripts. Edit inputs are
+  0.1%: whole-file writes dominate. Possible contract line, needs a bench.
+- Claude Code has idle-triggered tool-result clearing
+  (`clear_tool_uses_20250919`, fires after an idle gap, when the cache is
+  cold anyway) behind a server flag. Not user-tunable.
+
+Decision: ship `composition()` in residency.py with a test. No config change.
 
 ## Queue (expected % of bill x confidence / cost to test)
 
-1. Decompose resident context by block type (free replay). Decides whether
-   anything besides compaction can move the 58% read line.
-2. Compact window live measurement and compaction quality (largest modeled
+1. Hard bench tasks where Haiku/Sonnet fail sometimes. Blocks every quality
+   question below (effort, compaction, subagents, verify gate).
+2. Effort / thinking budget vs pass rate (thinking ~18% of bill).
+3. Compact window live measurement and compaction quality (largest modeled
    lever: doctor says 200k saves 22% here; quality unmeasured).
-3. Subagent prefix and model routing (each subagent pays its own prefix).
-4. Harder bench tasks so quality deltas show (prerequisite for 2, 3, verify
-   gate, thinking/effort).
+4. Subagent prefix and model routing (each subagent pays its own prefix).
 5. No-AI-tells detector `evals/tells.py` (deterministic part is free to build).
 6. Fixed prefix audit with `/context` (prefix now p50 22k; smaller lever than
    the seed assumed).

@@ -97,6 +97,23 @@ compaction.
 | Read | 0.8% |
 | WebFetch | 0.1% |
 
+Tool results are a minority of what the cache re-reads. Splitting every
+request's context growth by source (`composition()` in the same script; it
+reproduces 104% of the actual cache-read tokens):
+
+| Source | Share of cache reads |
+|---|---|
+| Tool results, prompts, hook and system injections | 34.5% |
+| Prefix: system prompt, tools, post-compaction summary | 29.9% |
+| Thinking from earlier turns | 21.1% |
+| Assistant text and tool-call inputs | 14.5% |
+
+Thinking stays resident: Claude Code 2.1.288 sends `clear_thinking` with
+`keep: "all"`, and on 548 of 549 heavy-thinking turns the next request grew
+by the full billed output. Transcripts store thinking with an empty body, so
+it is counted as billed output minus visible text. Counting both its output
+price and its residency, thinking is about 18% of the bill.
+
 Repeat Reads of an unchanged file and range: 26 of 618 (4%), 0.0% of the
 bill. A read-dedupe hook is not worth building.
 

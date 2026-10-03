@@ -37,7 +37,7 @@ def size_of(content) -> int:
 
 
 def load(path: Path) -> dict | None:
-    usage, order, times, uses, events = {}, [], {}, {}, []
+    usage, order, times, uses, events, visible = {}, [], {}, {}, [], Counter()
     for line in path.open(errors="ignore"):
         try:
             r = json.loads(line)
@@ -55,6 +55,9 @@ def load(path: Path) -> dict | None:
             for b in m.get("content") or []:
                 if isinstance(b, dict) and b.get("type") == "tool_use":
                     uses[b.get("id")] = (b.get("name", "?"), b.get("input") or {})
+                    visible[mid] += len(json.dumps(b.get("input")))
+                elif isinstance(b, dict) and b.get("type") == "text":
+                    visible[mid] += len(b.get("text", ""))
         elif r.get("type") == "user" and isinstance(m.get("content"), list):
             for b in m["content"]:
                 if isinstance(b, dict) and b.get("type") == "tool_result":
@@ -62,12 +65,38 @@ def load(path: Path) -> dict | None:
                     events.append(("result", len(order), name, inp, size_of(b.get("content"))))
     if not order:
         return None
+    # transcripts store thinking with an empty body, so hidden output = billed output - visible text/tool input
     return {"usage": [usage[m] for m in order], "times": [times[m] for m in order], "events": events,
+            "visible": [visible[m] / CHARS_PER_TOKEN for m in order],
             "subagent": "subagents" in path.parts or path.stem.startswith("agent-")}
 
 
 def context_of(u: dict) -> int:
     return sum(u.get(k, 0) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))
+
+
+def composition(sessions: list[dict]) -> Counter:
+    """Split cache-read volume by where the tokens came from, using each request's usage delta.
+
+    Prior thinking stays in context on Opus 5.x (Claude Code sends clear_thinking with keep "all"), so
+    an assistant turn's billed output is resident on every later request until the next compaction.
+    """
+    parts = Counter()
+    for s in sessions:
+        u, n = s["usage"], len(s["usage"])
+        compacts = sorted(i for kind, i, *_ in s["events"] if kind == "compact")
+        for i in range(n):
+            later = next((c for c in compacts if c > i), n) - i - 1
+            out = u[i].get("output_tokens", 0) or 0
+            vis = min(out, s["visible"][i])
+            parts["assistant text and tool calls"] += vis * later
+            parts["thinking"] += (out - vis) * later
+            if i == 0 or i in compacts:
+                parts["prefix (system, tools, summary)"] += context_of(u[i]) * later
+            else:
+                grew = context_of(u[i]) - context_of(u[i - 1]) - (u[i - 1].get("output_tokens", 0) or 0)
+                parts["tool results, prompts, injections"] += max(0, grew) * later
+    return parts
 
 
 def analyze(sessions: list[dict]) -> dict:
@@ -131,6 +160,10 @@ def main() -> int:
     rc = r["reread_calls"]
     print(f"\nRead: {rc['all']} calls, {rc['dup']} repeat an unchanged file+range "
           f"({rc['dup'] / max(1, rc['all']):.0%}); repeats are {r['reread']['dup'] / t:.1%} of the bill")
+    parts = composition(sessions)
+    print("\nWhat cache reads are made of")
+    for name, c in parts.most_common():
+        print(f"  {name:34} {c / sum(parts.values()):6.1%}")
     print("\nCache rewrites mid-session (write >20k while read <50% of prior context)")
     for kind in ("idle>5m", "idle>1h", "other"):
         print(f"  {kind:8} {r['busts'][kind]:5}  extra cost {r['bust_cost'][kind] / t:6.1%}")

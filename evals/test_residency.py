@@ -54,6 +54,18 @@ class TestResidency(unittest.TestCase):
         ]))
         self.assertEqual(residency.analyze([s])["busts"]["idle>1h"], 1)
 
+    def test_composition_charges_hidden_output_as_thinking(self):
+        out = lambda u, n: {**u, "output_tokens": n}
+        s = residency.load(transcript(self.path, [
+            assistant("m1", "2026-10-01T00:00:00Z", out(usage(0, 10_000), 1_000)),
+            assistant("m2", "2026-10-01T00:00:05Z", out(usage(10_000, 1_500), 0)),
+        ]))
+        parts = residency.composition([s])
+        # m1 has no visible content, so its 1,000 output tokens are thinking, resident on 1 later request
+        self.assertEqual(parts["thinking"], 1_000)
+        self.assertEqual(parts["prefix (system, tools, summary)"], 10_000)
+        self.assertEqual(parts["tool results, prompts, injections"], 0)
+
     def test_ttl_replay_turns_gaps_into_rewrites(self):
         s = residency.load(transcript(self.path, [
             assistant("m1", "2026-10-01T00:00:00Z", usage(0, 10_000)),
