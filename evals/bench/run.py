@@ -13,6 +13,10 @@ import argparse, json, os, shutil, subprocess, tempfile, time, glob, re, concurr
 B = os.path.dirname(os.path.abspath(__file__))
 AMX = os.path.dirname(os.path.dirname(B))
 TASKS = json.load(open(f"{B}/tasks.json"))
+REAL = f"{B}/real"
+CACHE = os.path.expanduser("~/.cache/agentmaxx-bench")
+if os.path.exists(f"{REAL}/tasks.json"):
+    TASKS.update(json.load(open(f"{REAL}/tasks.json")))
 ARMS = json.load(open(f"{B}/arms.json"))
 
 def fill(text):
@@ -29,8 +33,46 @@ def setup(arm, d):
                   open(f"{d}/.mcp-arm.json", "w"))
     subprocess.run("git add -A && git -c user.email=b@b -c user.name=b commit -qm arm --allow-empty", shell=True, cwd=d)
 
+def mirror(task):
+    t = TASKS[task]; m = f"{CACHE}/{t['repo'].rstrip('/').split('/')[-1].removesuffix('.git')}"
+    if not os.path.exists(m):
+        subprocess.run(["git", "clone", "-q", t["repo"], m], check=True)
+    return m
+
+def checkout(task, d):
+    """Real-repo task: the parent of an upstream fix, with history removed so the fix can't be looked up."""
+    subprocess.run(f"git archive {TASKS[task]['sha']} | tar -x -C {d}", shell=True, cwd=mirror(task), check=True)
+    subprocess.run("git init -q && git add -A && git -c user.email=b@b -c user.name=b commit -qm start", shell=True, cwd=d, check=True)
+
+def pytest_failures(d, t, args):
+    env = {**os.environ, "PYTHONPATH": os.path.join(d, t.get("pythonpath") or "")}
+    r = subprocess.run(["python3", "-m", "pytest", "-q", "-rfE", "-p", "no:cacheprovider", *args], cwd=d, env=env,
+                       capture_output=True, text=True, timeout=600)
+    failed = set(re.findall(r"^(?:FAILED|ERROR) (\S+)", r.stdout, re.M))
+    return failed, r.returncode
+
+def grade_real(t, d):
+    patch = f"{REAL}/{t['hidden']}"
+    touched = subprocess.run(["git", "apply", "--numstat", patch], cwd=d, capture_output=True, text=True).stdout
+    start = subprocess.run("git rev-list --max-parents=0 HEAD", shell=True, cwd=d, capture_output=True, text=True).stdout.split()[0]
+    for f in (l.split("\t")[-1] for l in touched.splitlines()):
+        # the agent's edits to these test files are discarded, as in SWE-bench
+        if subprocess.run(["git", "cat-file", "-e", f"{start}:{f}"], cwd=d, capture_output=True).returncode == 0:
+            subprocess.run(["git", "checkout", start, "--", f], cwd=d)
+        elif os.path.exists(os.path.join(d, f)):
+            os.remove(os.path.join(d, f))
+    if subprocess.run(["git", "apply", patch], cwd=d).returncode != 0:
+        return False
+    failed, code = pytest_failures(d, t, t["hidden_tests"] + t.get("hidden_guard_tests", []))
+    if failed or code not in (0,):
+        return False
+    failed, _ = pytest_failures(d, t, t.get("regress_tests", []))
+    return not (failed - set(t.get("known_failures", [])))
+
 def grade(task, d, result_text):
     t = TASKS[task]
+    if "repo" in t:
+        return grade_real(t, d)
     if "answer" in t:
         m = re.findall(r"CODES:\s*(.*)", result_text or "")
         got = {c.strip().strip("`*").upper() for c in (m[-1].split(",") if m else []) if c.strip()}
@@ -62,7 +104,11 @@ def transcript_stats(session_id):
 
 def one(arm, task, rep, model):
     a = ARMS[arm]; d = tempfile.mkdtemp(prefix=f"amx-{arm}-{task}-")
-    shutil.copytree(f"{B}/fixture", d, dirs_exist_ok=True); setup(arm, d)
+    if "repo" in TASKS[task]:
+        checkout(task, d)
+    else:
+        shutil.copytree(f"{B}/fixture", d, dirs_exist_ok=True)
+    setup(arm, d)
     env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_BASE_URL",)}
     env.update(a.get("env", {})); env["AGENTMAXX_HOME"] = tempfile.mkdtemp(prefix="amx-home-")
     cmd = ["claude", "-p", TASKS[task]["prompt"], "--model", model, "--output-format", "json",
@@ -90,6 +136,8 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(); ap.add_argument("arms", nargs="+"); ap.add_argument("--reps", type=int, default=3)
     ap.add_argument("--model", default="claude-sonnet-5-5"); ap.add_argument("--jobs", type=int, default=4); ap.add_argument("--tasks", default=",".join(TASKS))
     a = ap.parse_args()
+    for t in {t for t in a.tasks.split(",") if "repo" in TASKS[t]}:
+        mirror(t)
     jobs = [(arm, t, r) for r in range(a.reps) for t in a.tasks.split(",") for arm in a.arms]
     with cf.ThreadPoolExecutor(a.jobs) as ex:
         list(ex.map(lambda x: one(*x, a.model), jobs))
