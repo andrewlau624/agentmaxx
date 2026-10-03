@@ -83,7 +83,16 @@ summary output, then a cache rewrite):
 | 200k | −26% | 684 |
 | 150k | +4% (thrashes: 86k prefix + 33k buffer) | 2,560 |
 
-Quality is not simulated. The research says smaller context helps (Chroma
+Quality, measured since: on the 10 real-repo tasks, Haiku 4.5 with
+compaction forced at ~40k tokens (`CLAUDE_CODE_AUTO_COMPACT_WINDOW=100000`,
+the minimum, plus `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40`) passed 13/21 vs
+17/20 without (one-sided Fisher p = 0.09), and cost +19% (90% CI −9% to
++49%) because every compaction rewrites the cache. The losses were on tasks
+that need detail held across many steps. This is far more aggressive than
+any real window, but it points the same way as the research: compaction
+costs quality, so `doctor` no longer recommends windows below 300k.
+
+Earlier note: quality is not simulated. The research says smaller context helps (Chroma
 "context rot", lost-in-the-middle; Anthropic's context editing +29%), but
 each compaction can drop detail, which is why the default is 300k, not 200k.
 

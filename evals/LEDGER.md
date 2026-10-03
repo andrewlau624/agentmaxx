@@ -6,7 +6,7 @@ last. Every number has the command that produced it.
 Cost is the weighted index: input 1, cache write 1.25 (5m) or 2 (1h), cache
 read 0.1, output 5.
 
-Bench spend so far: $26.6 (estimates are logged before each batch; actuals after).
+Bench spend so far: $39.7 (cap $40 reached: paused for a go-ahead) (estimates are logged before each batch; actuals after).
 
 ## Iteration 1 (2026-10-03): price what sits in context
 
@@ -277,6 +277,18 @@ Probe: one Haiku run compacted twice, peak 32k, passed, $0.23.
 Hypothesis: forced compaction mid-task drops Haiku's pass rate on the real
 tasks by >=15 points. Arm v2_c40, 10 tasks x 2 reps vs the 20 Haiku v2
 calibration runs. Estimate ~$5.50; cumulative ~$37.50.
+
+Result ($8.46 + $0.23 probe): v2_c40 passed 13/21 vs v2 17/20 (one-sided
+Fisher p = 0.09). Losses: tzcast 2/2 -> 0/2, emphasis-mod3 1/2 -> 0/2,
+begin-end 2/2 -> 1/2. Cost +19% (90% CI -9% to +49%); median peak context
+62k -> 33k but cache writes rose 47k -> 84k. Hypothesis (>=15 point drop)
+holds in the point estimate (23 points), not yet at p < 0.05.
+
+Decision: don't push the window lower. doctor stopped recommending 200k
+(it compacts 2.4x as often as 300k in replay for ~1 point of modeled
+saving); it now picks between 300k and 400k. The installed default stays
+300k. Whether 300k itself costs quality vs 1M is still unmeasured: it needs
+long tasks that cross 300k, which the bench doesn't have.
 
 ## Queue (expected % of bill x confidence / cost to test)
 

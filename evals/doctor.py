@@ -129,7 +129,10 @@ def main() -> int:
         print(f"  {advice}. Prefix is {pct(prefixes, .5):,} tokens. Check /context; set ENABLE_TOOL_SEARCH=true and drop unused MCP servers.")
     window = env.get("CLAUDE_CODE_AUTO_COMPACT_WINDOW")
     base = simulate_window(sessions, int(window) if window else None)
-    best = min((simulate_window(sessions, w), w) for w in (200_000, 300_000, 400_000))
+    # Not below 300k: each compaction can drop task detail. Forcing compaction mid-task cut Haiku's pass
+    # rate on the real-repo bench from 17/20 to 13/21 (evals/RESULTS.md), and 200k compacts 2.4x as often
+    # as 300k for about one point of modeled savings.
+    best = min((simulate_window(sessions, w), w) for w in (300_000, 400_000))
     if (base - best[0]) / total > 0.05:
         advice += 1
         print(f"  {advice}. Auto-compact window {window or 'model default (~1M on [1m] models)'}: replaying your sessions at "
