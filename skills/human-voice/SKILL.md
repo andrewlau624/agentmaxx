@@ -25,6 +25,8 @@ Patterns:
 - Copula avoidance. "Serves as", "acts as", "functions as" where plain "is" belongs.
 - Formatting tics. Em-dash pileups, title-case headings on everything, bold-spam, emoji as bullets, tables for two items.
 
+The word list above was measured on GPT-4-era text. On Claude-written docs it barely shows up; what does show up, measured against human docs in this repo (`evals/tells-sources/measured.md`), is spaced em dashes (about 57 times the human rate in software docs), lines that open with a bold label and a colon, and `→` used as prose punctuation.
+
 ## How people actually write
 
 Sentence length varies, occasionally into fragments. They take positions instead of presenting every view evenhandedly. They concede uncertainty bluntly ("not sure this works") rather than hedging every clause. Contractions, first person, asides, and the odd joke all stay. Headers appear only where a skimming reader needs them, which for most documents means none or two. And they explain their choices when it matters ("I picked SQLite because nothing needed a server"); model writing almost never volunteers a reason.

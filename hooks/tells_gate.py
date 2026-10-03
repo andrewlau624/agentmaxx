@@ -8,8 +8,8 @@ and denies it once with the hits.
 
 Each file is flagged at most once per session, and commits once per session,
 so a quoted tell (a style guide, a test fixture) can never trap the agent.
-Thresholds sit above the human baseline in evals/RESULTS.md: pre-2022 docs
-from four projects run p90 1.4 hits per 1k words, commits 0.2% with any hit.
+Every rule has a source or a measurement (evals/tells-sources/); thresholds were
+set against pre-2022 human docs and commits (see over()).
 Disable with AGENTMAXX_TELLS=0.
 """
 from __future__ import annotations
@@ -28,7 +28,8 @@ sys.path[:0] = [str(HERE), str(HERE.parent / "evals")]  # installed copy sits ne
 from tells import EXT_KIND, score  # noqa: E402
 
 STATE = Path(os.environ.get("AGENTMAXX_HOME", os.path.expanduser("~/.local/share/agentmaxx"))) / "tells"
-# minimum hits and density before a file is flagged
+WEAK = {"inline-header list item", "bold label line"}  # humans use these too; reported, never trigger
+# minimum hits and density before a non-prose file is flagged
 LIMITS = {"prose": (3, 3.0), "ui": (3, 0.0), "code": (2, 0.0), "commit": (1, 0.0)}
 EMOJI_SUBJECT = re.compile(r"^[\U0001F300-\U0001FAFF✅✨⭐⚡]")
 
@@ -44,6 +45,11 @@ def once(session: str, key: str) -> bool:
 
 
 def over(r: dict) -> bool:
+    """Prose: two or more hits from rules other than the weak formatting ones. On this machine's docs that
+    flags 22% of model-written docs and 1% of pre-2022 human docs (evals/tells-sources/measured.md);
+    counting inline-header lists too pushed the human rate to 6-14%."""
+    if r["kind"] == "prose":
+        return sum(len(v) for k, v in r["hits"].items() if k not in WEAK) >= 2
     hits, density = LIMITS[r["kind"]]
     return r["count"] >= hits and r["density"] >= density
 

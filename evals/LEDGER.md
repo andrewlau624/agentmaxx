@@ -290,6 +290,30 @@ saving); it now picks between 300k and 400k. The installed default stays
 300k. Whether 300k itself costs quality vs 1M is still unmeasured: it needs
 long tasks that cross 300k, which the bench doesn't have.
 
+## Iteration 10: sourced tells (user asked whether the catalog was researched; it wasn't)
+
+The first tells.py came from the prompt's list and the existing skills, not
+from sources. Redone: three subagents built catalogs with fetched URLs and
+verbatim quotes (`evals/tells-sources/{prose,ui,code}.md`); I re-fetched 12
+quotes from 9 sources and all matched. One correction to an agent: the
+function-name-length numbers are from the paper's Java table.
+
+Validation against our data (`evals/tells_mine.py`, `measured.md`): the
+GPT-era word lists don't separate Claude 5.x docs from human docs. A first
+run said they did, because the model corpus included the catalogs the
+agents had just written; those are now excluded by path. Separating
+features: spaced em dash, `→`, bold label lines, inline-header lists (weak).
+
+tells.py rewritten: each rule carries source ids or "measured"; unsourced
+rules dropped ("Let me" narration, "Great question", "This commit", generic
+names, version-suffix names, emoji in code, made-up stats renamed to the
+sourced stat-banner idea and left out as not regex-checkable). New UI
+rules from the sources, including design-slop-cop's purple thresholds and
+Anthropic's second-order cream/terracotta default. Gate counts only strong
+rules: 22% of model docs, 1% of human docs.
+
+Still not done: the LLM-judge pass (needs bench budget).
+
 ## Queue (expected % of bill x confidence / cost to test)
 
 Remaining budget before the $40 pause: ~$10 after the regression run.

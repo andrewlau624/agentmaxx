@@ -170,7 +170,7 @@ class TestTellsGate(unittest.TestCase):
 
     def test_commit_denied_once(self):
         event = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "session_id": "s", "cwd": self.home,
-                 "tool_input": {"command": "git commit -m 'This commit adds a robust, seamless parser'"}}
+                 "tool_input": {"command": "git commit -m 'Rework the parser — I hope this helps'"}}
         self.assertIn('"deny"', self.run_hook(event))
         self.assertEqual(self.run_hook(event), "")
         clean = {**event, "session_id": "t", "tool_input": {"command": "git commit -m 'parse dates in UTC'"}}
@@ -178,13 +178,13 @@ class TestTellsGate(unittest.TestCase):
 
     def test_written_doc_flagged_once(self):
         doc = pathlib.Path(self.home) / "README.md"
-        doc.write_text("Great question! This robust tool seamlessly leverages AI, highlighting the power.\n"
+        doc.write_text("This tool stands as a testament to design, highlighting the power. It delves into the details.\n"
                        "- **Fast:** yes\n- **Safe:** yes\nHope this helps!\n")
         event = {"hook_event_name": "PostToolUse", "tool_name": "Write", "session_id": "s",
                  "tool_input": {"file_path": str(doc), "content": doc.read_text()}}
         out = self.run_hook(event)
         self.assertIn('"block"', out)
-        self.assertIn("filler word", out)
+        self.assertIn("significance padding", out)
         self.assertEqual(self.run_hook(event), "")
 
     def test_plain_doc_passes(self):

@@ -47,6 +47,8 @@ Models regress to the statistical mean of their training data, and UI training d
 - Components: `rounded-2xl shadow-lg p-6` shadcn card untouched; the colored left-border strip (the single most reliable tell); glassmorphism by reflex (`backdrop-blur` + white-alpha + glow) regardless of what sits behind it; icon-in-rounded-square; cards nested inside cards.
 - Details: lucide `Sparkles`/`Zap` defaults, emoji as feature icons, the same fade-in-up on every element or bounce on every hover, CTA contrast below 4.5:1.
 
+- Second-order defaults: avoiding the indigo template tends to land on the next default instead. Anthropic's frontend-design skill names a warm cream background near `#F4F1EA` with a serif display face and a terracotta accent near `#D97757`, and a near-black page with one acid-green or vermilion accent. In this repo's bench, 13 of 30 generated pages used the cream background.
+
 Countermeasures that actually work: commit to one direction and carry it through (a dominant color with a sharp accent beats any timid gradient); pick a typeface pairing deliberately and name why; introduce asymmetry where content allows; let motion serve one or two key moments instead of every element; measure contrast instead of eyeballing it.
 
 ## With the rest of agentmaxx

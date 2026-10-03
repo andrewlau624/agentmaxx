@@ -141,6 +141,41 @@ the whole context on each of the 369 and cost **+19%** despite cheaper writes.
 only when the other TTL is more than 3% cheaper. Rewrites after more than an
 hour idle cost 7.0% of the bill, and no TTL setting avoids them.
 
+## Machine-writing tells: sources and measurement
+
+Sourced catalogs in `evals/tells-sources/`: prose (10 sources, including
+Wikipedia's "Signs of AI writing", Kobak, Liang, Reinhart, Juzek & Ward,
+Freeburg), UI (17, including Anthropic's frontend-design skill and Krebs'
+design-slop-cop detector), code/commits/PRs/security reports (23, including
+10 arXiv studies and curl's posts). Every entry has a fetched URL and a
+verbatim quote; 12 quotes were re-fetched and checked by hand. Every rule in
+`evals/tells.py` names its source ids or "measured".
+
+Measured on 209 docs Claude 5.x wrote on this machine vs 334 pre-2022 human
+docs (`python3 evals/tells_mine.py`; catalogs and style guides excluded
+because they quote the tells):
+
+| Signal | Model | Human |
+|---|---|---|
+| GPT-4-era word lists (Kobak, Reinhart, Juzek, Wikipedia), per 1k words | 0.006-0.105 | 0.008-0.647 |
+| Spaced em dash, docs containing one | 60 / 209 | 3 / 334 |
+| `→` in prose, docs | 34 / 209 | 0 / 334 |
+| Line opening with a bold label and colon, docs | 66 / 209 | 24 / 334 |
+| Inline-header list items, docs | 114 / 209 | 53 / 334 |
+
+The published word lists are real but describe GPT-4/4o; on this output
+they occur at the human rate. Freeburg is the one source that measured
+Claude directly (Opus 4.6: 9.09 em dashes per 1k words vs a human mean of
+3.23), and it matches what separates here.
+
+With only the strong rules counting (formatting rules reported but not
+triggering), the tells gate would flag 22% of the model docs and 1% of the
+human docs; counting inline-header lists too raised the human rate to
+6-14%. Re-scoring the bench's generation outputs: no prose doc reaches the
+gate; 13 of 30 generated pages use the cream background near `#F4F1EA`
+that Anthropic's own frontend-design skill lists as a second-order default.
+The old regex list had called those pages clean.
+
 ## Effort level (bench, negative)
 
 Sonnet 5.5, `v2` arm, 10 real-repo tasks x 3 reps per arm.

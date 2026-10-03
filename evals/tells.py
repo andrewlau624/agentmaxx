@@ -22,69 +22,109 @@ from pathlib import Path
 I = re.IGNORECASE
 M = re.MULTILINE
 
-FILLER = (
-    "delve|delves|delving|tapestry|testament|vibrant|realm|multifaceted|intricate|pivotal|bolster|foster|"
-    "seamless|seamlessly|robust|leveraging|leverages|leverage (?:the|our|your|their|its|this|these|existing|modern)|elevate|elevates|empower|empowers|unleash|unlock|"
-    "game-changer|cutting-edge|best-in-class|supercharge|streamline|holistic|synergy|paradigm|"
-    "meticulous|meticulously|commendable|showcase|showcasing|underscore|underscores|ever-evolving|"
-    "embark|navigating the|in the realm of"
-)
+# Every rule names its evidence: source ids from evals/tells-sources/{prose,ui,code}.md, or "measured"
+# for a feature that separated model from human docs in evals/tells-sources/measured.md. Rules with
+# neither were removed on 2026-10-03, along with the GPT-era word lists' claim to cover current models:
+# on this machine's Claude 5.x docs they occur at the human rate (measured.md).
+
+# Rare words with large measured excess in GPT-4-era text (Kobak, Liang, Reinhart, Juzek & Ward, Wikipedia)
+GPT_ERA = ("delve|delves|delved|delving|tapestry|underscores?|underscoring|showcasing|showcases|meticulous|meticulously|"
+           "intricate|intricacies|pivotal|commendable|camaraderie|palpable|amidst|realm|boasts|garnered|interplay|"
+           "unwavering|testament")
 
 PROSE = {
-    "filler word": re.compile(rf"\b({FILLER})\b", I),
-    "crucial/vital/essential as filler": re.compile(r"\b(it is|it's) (crucial|vital|essential|important) to\b|\bplays? an? (crucial|vital|pivotal|key) role\b", I),
-    "significance padding": re.compile(r"\b(stands as|serves as) an? (testament|reminder|example)\b|\bin today's (fast-paced|ever-changing|digital|modern)\b", I),
-    "not X, it's Y": re.compile(r"\b(it's|it is|this is|that's) not (just |only |merely )?[^.;\n]{1,40}[,;—-]+ (it's|it is|but)\b|\bnot (just|only|merely) [^.;\n]{1,40}, but (also )?\b", I),
-    "opener": re.compile(r"^\s*(great question|certainly!|absolutely!|of course!|sure!|i'd be happy to|happy to help)", I | M),
-    "wrap-up": re.compile(r"^\s*(in summary|in conclusion|overall|to summarize|to sum up|ultimately)\b,?", I | M),
-    "closing offer": re.compile(r"\b(let me know if|feel free to|hope this helps|happy to (help|adjust|elaborate)|want me to)\b", I),
-    "narration": re.compile(r"^\s*(let me|i'll now|now i'll|first, i'll)\b", I | M),
-    "hedge stack": re.compile(r"\b(may|might|could) (potentially|possibly|perhaps)\b|\bit('s| is) worth (noting|mentioning) that\b|\bit is important to note\b", I),
-    "participle tail": re.compile(r", (highlighting|underscoring|reflecting|ensuring|showcasing|emphasizing|demonstrating) (the|its|their|a|how)\b", I),
-    "copula dodge": re.compile(r"\b(serves|acts|functions) as (a|an|the)\b", I),
-    "vague attribution": re.compile(r"\b(experts (say|agree|note)|is widely (considered|regarded|recognized)|many (believe|argue|find))\b", I),
-    "bold-label bullet": re.compile(r"^\s*[-*] \*\*[^*\n]{1,40}:?\*\*:?", M),
-    "emoji marker": re.compile(r"^\s*(#+ |[-*] )?[\U0001F300-\U0001FAFF✅❌⚠✨⭐]", M),
-    "em dash": re.compile(r"—"),
+    "spaced em dash": (re.compile(r" — "), "W, F (Claude Opus 4.6 9.09/1k vs human mean 3.23/1k), measured"),
+    "inline-header list item": (re.compile(r"^\s*([-*•–]|\d+\.)\s*\*\*[^*\n]+\*\*", M), "W, measured (weak: 114/209 vs 53/334 docs)"),
+    "bold label line": (re.compile(r"^\*\*[^*\n]+:\*\*|^\*\*[^*\n]+\*\*:", M), "W (variant), measured (66/209 vs 24/334 docs)"),
+    "arrow in prose": (re.compile(r"→"), "measured only (34/209 vs 0/334 docs)"),
+    "emoji marker": (re.compile(r"^\s*(#+ |[-*] )?[\U0001F300-\U0001FAFF✅❌⚠✨⭐]", M), "W"),
+    "GPT-era word": (re.compile(rf"\b({GPT_ERA})\b", I), "K, L1, L2, R, J, W (GPT-4/4o era; at human rate on Claude 5.x here)"),
+    "significance padding": (re.compile(r"\b(stands|serves) as an? (testament|reminder)\b|\bis a testament to\b|\bplays? an? (crucial|pivotal|vital|significant|key) role\b|"
+                                        r"\b(evolving|ever-evolving) landscape\b|\bindelible mark\b|\bsetting the stage for\b|\bdeeply rooted\b", I), "W, RU"),
+    "negative parallelism": (re.compile(r"\bnot only\b.{0,80}\bbut( also)?\b|\bit['’]?s not (just |only |merely )?[^.;\n]{1,40}[,;—-]+ (it['’]?s|it is)\b|\bit['’]?s not about\b.{0,60}\bit['’]?s about\b", I), "W, RU"),
+    "participle tail": (re.compile(r", (highlighting|underscoring|reflecting|ensuring|showcasing|emphasizing|symbolizing|contributing to|fostering) (the|its|their|a|how)\b", I), "W, R (participial clauses 5.3x human rate in GPT-4o)"),
+    "copula avoidance": (re.compile(r"\b(serves|stands|functions) as (a|an|the)\b|\bboasts an?\b", I), "W"),
+    "vague attribution": (re.compile(r"\b(industry reports|observers have (cited|noted)|experts (argue|say|note)|some critics argue|several (sources|publications))\b", I), "W"),
+    "chatbot phrasing": (re.compile(r"\b(i hope this helps|you['’]re absolutely right|is there anything else|let me know if|would you like me to|more detailed breakdown)\b|^\s*(certainly|of course)!", I | M), "W"),
+    "section summary": (re.compile(r"^\s*(in summary|in conclusion|to summarize)\b|^#+ conclusion\s*$", I | M), "W, RU"),
+    "knowledge-cutoff disclaimer": (re.compile(r"\b(as of my last (knowledge|training) update|up to my last training update|as an ai language model|as a large language model)\b", I), "W"),
+    "placeholder": (re.compile(r"\[(your name|describe[^\]]*|insert[^\]]*)\]|20\d\d-(xx|XX)-(xx|XX)", I), "W"),
+    "citation artifact": (re.compile(r"contentReference\[oaicite:\d+\]|oai_citation|\[cite: ?\d+\]|turn\d+search\d+|grok_card|【\d+†"), "W"),
 }
 
 COMMIT = {
-    "this commit": re.compile(r"^\s*this (commit|pr|change|pull request)\b", I | M),
-    "emoji prefix": re.compile(r"^[\U0001F300-\U0001FAFF✅✨⭐⚡]"),
-    "filler word": PROSE["filler word"],
-    "summary heading": re.compile(r"^#+ (summary|changes|overview)\b", I | M),
+    "emoji prefix": (re.compile(r"^[\U0001F300-\U0001FAFF✅✨⭐⚡]"), "S18 (Wikipedia via Gentoo policy)"),
+    "spaced em dash": (re.compile(r" — "), "S18"),
+    "inline-header list item": (PROSE["inline-header list item"][0], "S18"),
+    "chatbot phrasing": (PROSE["chatbot phrasing"][0], "S18"),
+    "GPT-era word": (PROSE["GPT-era word"][0], "K, J, W"),
 }
 
 UI = {
-    "purple/indigo gradient": re.compile(r"\b(from|via|to)-(indigo|violet|purple|fuchsia)-\d{3}\b|linear-gradient\([^)]*(#6366f1|#8b5cf6|#a855f7|#7c3aed|#4f46e5|indigo|violet|purple)", I),
-    "gradient text": re.compile(r"\bbg-clip-text\b|-webkit-background-clip:\s*text|background-clip:\s*text", I),
-    "glassmorphism": re.compile(r"\bbackdrop-blur(-\w+)?\b|backdrop-filter:\s*blur", I),
-    "rounded-2xl + shadow card": re.compile(r"rounded-(2xl|3xl)[^\"'`]*shadow-(lg|xl|2xl)|shadow-(lg|xl|2xl)[^\"'`]*rounded-(2xl|3xl)"),
-    "hover lift": re.compile(r"hover:(-translate-y-\d|scale-10[5-9])"),
-    "colored left-border strip": re.compile(r"\bborder-l-(4|8)\b[^\"'`]*border-(\w+)-\d{3}|border-left:\s*[3-8]px solid", I),
-    "sparkle/robot icon": re.compile(r"\b(Sparkles|Sparkle|Wand2|Bot|BrainCircuit)\b|✨|🤖|🚀"),
-    "emoji as icon": re.compile(r">\s*[\U0001F300-\U0001FAFF✨⚡⭐]\s*<"),
-    "badge pill above hero": re.compile(r"rounded-full[^\"'`]*(px-3|text-xs)[^\"'`]*\"[^>]*>\s*[^<]{0,40}(new|introducing|announcing|beta|✨)", I),
-    "template copy": re.compile(r"\b(unlock the (power|potential)|seamlessly|supercharge|elevate your|take your \w+ to the next level|trusted by (thousands|teams|developers)|built for the (future|modern)|get started (for free|today)|revolutioniz\w+)\b", I),
-    "made-up stat": re.compile(r">\s*\d{1,3}(\.\d)?(k|K|M|\+|%|x)\+?\s*<"),
-    "inter-only type": re.compile(r"font-family:\s*['\"]?Inter['\"]?\s*,\s*(sans-serif|system-ui)|fontFamily:\s*\{\s*sans:\s*\[\s*['\"]Inter", I),
+    "indigo/violet utility class": (re.compile(r"\b(bg|text|from|via|to|border|ring)-(indigo|violet|purple)-\d{2,3}\b"), "S5, S6, S7, S9, S13"),
+    "purple gradient": (re.compile(r"\b(from|via|to)-(indigo|violet|purple|fuchsia)-\d{3}\b[^\"'`]*\b(from|via|to)-\w+-\d{3}|linear-gradient\([^)]*(indigo|violet|purple)", I), "S2, S3, S4, S12"),
+    "blue-600 to purple-600": (re.compile(r"from-blue-600[^\"'`]*to-purple-600"), "S17"),
+    "gradient text": (re.compile(r"\bbg-clip-text\b|-webkit-background-clip:\s*text|background-clip:\s*text", I), "S7, S9, S14, S16"),
+    "glassmorphism": (re.compile(r"\bbackdrop-blur(-\w+)?\b|backdrop-filter:\s*blur", I), "S6, S7, S14, S16"),
+    "colored left border": (re.compile(r"\bborder-l-(2|4|8)\b[^\"'`]*\bborder-\w+-\d{3}\b|border-left:\s*([2-9]|\d\d)px solid", I), "S6, S14"),
+    "large uniform radius + shadow": (re.compile(r"rounded-(2xl|3xl)[^\"'`]*shadow-(md|lg|xl|2xl)|shadow-(md|lg|xl|2xl)[^\"'`]*rounded-(2xl|3xl)"), "S1, S15, S16, S17"),
+    "tracked uppercase label": (re.compile(r"\buppercase\b[^\"'`]*\btracking-(wide|wider|widest|\[0?\.\d+em\])|text-transform:\s*uppercase;[^}]*letter-spacing:\s*0?\.[1-9]", I), "S1, S6, S14"),
+    "three-column card grid": (re.compile(r"\b(md:|lg:)?grid-cols-3\b|grid-template-columns:\s*repeat\(3,", I), "S6, S9, S10, S12, S14"),
+    "pill badge": (re.compile(r"\brounded-full\b[^\"'`]*\b(px-3|text-xs)\b[^>]*>\s*[^<]{0,40}\b(new|introducing|announcing|beta)\b", I), "S6, S7"),
+    "emoji as icon": (re.compile(r">\s*[\U0001F300-\U0001FAFF✨⚡⭐]\s*<"), "S6, S7, S14"),
+    "sparkle icon": (re.compile(r"\b(Sparkles|Sparkle)\b|✨"), "S15, S16 (community skills only)"),
+    "hype copy": (re.compile(r"\b(supercharge|unlock the (power|potential)|elevate your|seamless(ly)?)\b", I), "S15, S16"),
+    "generic sans as the only face": (re.compile(r"font-family:\s*['\"]?(Inter|Roboto|Arial|Open Sans|Lato)['\"]?\s*,\s*(sans-serif|system-ui|-apple-system)|family=Inter\b|from ['\"]next/font/google['\"].*\bInter\b", I), "S3, S4, S6, S13"),
+    "fallback display face": (re.compile(r"\b(Space Grotesk|Instrument Serif|Geist|Fraunces|Bricolage Grotesque|Sora|Young Serif|Syne)\b"), "S3, S6, S7, S17"),
+    "tinted near-black": (re.compile(r"#(0b0b0b|111111|111)\b", I), "S1"),
 }
 
 CODE = {
-    "comment restates code": re.compile(r"^\s*(#|//)\s*(import|define|initialize|initialise|create|set|get|return|loop (through|over)|iterate (through|over)|check if|call|increment|add|update|print|log)\b[^\n]{0,40}$", I | M),
-    "swallowed exception": re.compile(r"except( Exception| BaseException)?( as \w+)?:\s*(\n\s*)?(pass|return None|continue)\b|catch\s*\(\w*\)\s*\{\s*\}", M),
-    "broad except + log": re.compile(r"except Exception( as \w+)?:\s*\n\s*(logger|logging|log|print)\b|catch\s*\((e|err|error)\)\s*\{\s*console\.(error|log)", M),
-    "placeholder": re.compile(r"\b(TODO: implement|your code here|add your \w+ here|placeholder (implementation|logic)|implement (this|me) later|not implemented yet)\b", I),
-    "generic name": re.compile(r"\b(handle|process|manage)(Data|Item|Stuff|Thing|Request|Input)\b|\b(process|handle|manage)_(data|item|stuff|thing|input)\b|\bdo_?[Ss]tuff\b"),
-    "version-suffix name": re.compile(r"\b(def|class|function|const|let|var)\s+((enhanced|improved|better|fixed|updated)_?[A-Za-z]\w*|\w+_(v2|new|fixed|improved|enhanced))\b"),
-    "emoji in code": re.compile(r"[\U0001F300-\U0001FAFF✅❌✨]"),
-    "debug print": re.compile(r"^\s*(print\(f?[\"'](debug|DEBUG|>>>|---)|console\.log\()", M),
+    "swallowed exception": (re.compile(r"except( Exception| BaseException)?( as \w+)?:\s*(\n\s*)?(pass|return None|continue)\b|catch\s*\(\w*\)\s*\{\s*\}", M), "S4, S20"),
+    "log-only error handler": (re.compile(r"except Exception( as \w+)?:\s*\n\s*(logger|logging|log|print)\b[^\n]*\n(?!\s*raise)|catch\s*\((e|err|error)\)\s*\{\s*console\.(error|log)\([^)]*\);?\s*\}", M), "S20"),
+    "placeholder": (re.compile(r"\b(TODO: implement|your code here|add your \w+ here|implement (this|me|here)|replace (this )?with your( own)? implementation|placeholder (implementation|logic))\b", I), "S1, S20"),
+    "narrating comment": (re.compile(r"^\s*(#|//)\s*(step \d+[:.]|first,? we|now we|next,? we|here we|this (function|method|code) (will|does))\b", I | M), "S20"),
+    "section banner comment": (re.compile(r"^\s*(#|//)\s*[=\-*#]{8,}\s*$", M), "S20"),
+    "chat residue": (re.compile(r"^(here('s| is) (the|an?|your) (updated|complete|full|revised)\b|```\w*\s*$)", I | M), "S21"),
+    "debug print": (re.compile(r"^\s*(print\(f?[\"'](debug|DEBUG|>>>|---)|console\.log\(|System\.out\.println\(|\w+\.printStackTrace\(\))", M), "S1, S3"),
 }
-
 EXT_KIND = {".md": "prose", ".txt": "prose", ".rst": "prose", ".html": "ui", ".css": "ui", ".jsx": "ui",
             ".tsx": "ui", ".vue": "ui", ".svelte": "ui", ".py": "code", ".js": "code", ".ts": "code",
             ".go": "code", ".rs": "code", ".java": "code", ".rb": "code", ".sh": "code"}
 RULES = {"prose": PROSE, "commit": COMMIT, "ui": UI, "code": CODE}
+SOURCES = {kind: {name: src for name, (_, src) in rules.items()} for kind, rules in RULES.items()}
+
+
+def _hsl(h: str) -> tuple[float, float, float]:
+    r, g, b = (int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    hi, lo = max(r, g, b), min(r, g, b)
+    l = (hi + lo) / 2
+    if hi == lo:
+        return 0.0, 0.0, l
+    d = hi - lo
+    s = d / (2 - hi - lo) if l > 0.5 else d / (hi + lo)
+    hue = (g - b) / d % 6 if hi == r else (b - r) / d + 2 if hi == g else (r - g) / d + 4
+    return hue * 60, s, l
+
+
+def color_hits(text: str) -> dict:
+    """Hex-color tells. Purple uses design-slop-cop's isPurple thresholds (ui S7). The cream and
+    terracotta windows are this repo's approximation of "near #F4F1EA" and "near #D97757" (ui S1)."""
+    hits: dict[str, list[str]] = {}
+    for h in dict.fromkeys(x.lower() for x in re.findall(r"#([0-9a-fA-F]{6})\b", text)):
+        hue, sat, light = _hsl(h)
+        r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+        if 250 <= hue <= 300 and sat > 0.25 and 0.15 < light < 0.85:
+            hits.setdefault("purple color", []).append("#" + h)
+        if r >= 240 and g >= 235 and b >= 220 and 3 <= r - b <= 30:
+            hits.setdefault("cream background (second-order default)", []).append("#" + h)
+        if 190 <= r <= 235 and 95 <= g <= 135 and 70 <= b <= 110:
+            hits.setdefault("terracotta accent (second-order default)", []).append("#" + h)
+    return hits
+
+
+SOURCES["ui"].update({"purple color": "S7 thresholds; S5, S6, S9", "cream background (second-order default)": "S1 (window approximated)",
+                      "terracotta accent (second-order default)": "S1 (window approximated)"})
 CODE_BLOCK = re.compile(r"```.*?```", re.S)
 INLINE_CODE = re.compile(r"`[^`\n]*`")
 
@@ -111,21 +151,23 @@ def score(text: str, kind: str, allow_emoji: bool = False) -> dict:
         body = INLINE_CODE.sub("", CODE_BLOCK.sub("", text))
         body = "\n".join(l for l in body.splitlines() if not l.lower().startswith("co-authored-by:"))
     hits = {}
-    for name, rx in RULES[kind].items():
+    for name, (rx, _) in RULES[kind].items():
         if allow_emoji and name == "emoji prefix":
             continue
         found = [m.group(0).strip() for m in rx.finditer(body)]
         if found:
             hits[name] = found
+    if kind == "ui":
+        hits.update(color_hits(body))
     words = len(body.split())
     lines = sum(1 for l in text.splitlines() if l.strip())
     n = sum(len(v) for v in hits.values())
     if kind in ("prose", "commit"):
-        # an em dash or two is punctuation; a pileup is the tell
-        dashes = len(hits.get("em dash", []))
-        if dashes and dashes <= max(1, words // 250):
+        # Human prose averages 3.23 em dashes per 1k words (prose F); only a rate well above that counts
+        dashes = len(hits.get("spaced em dash", []))
+        if dashes and dashes * 1000 / max(words, 1) < 5 and dashes < 3:
             n -= dashes
-            hits.pop("em dash")
+            hits.pop("spaced em dash")
         unit, density = "per 1k words", n * 1000 / max(words, 1)
     elif kind == "ui":
         unit, density = "per file", float(n)
@@ -157,7 +199,7 @@ def main() -> int:
         print(f"{f}: {r['count']} tells, {r['density']} {r['unit']}" + (f", rhythm cv {r['rhythm_cv']}" if "rhythm_cv" in r else ""))
         for name, found in r["hits"].items():
             sample = ", ".join(dict.fromkeys(found))[:100]
-            print(f"  {name} x{len(found)}: {sample}")
+            print(f"  {name} x{len(found)}: {sample}   [{SOURCES[kind].get(name, '?')}]")
     return 1 if over else 0
 
 
