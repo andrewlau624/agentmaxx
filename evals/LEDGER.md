@@ -6,7 +6,7 @@ last. Every number has the command that produced it.
 Cost is the weighted index: input 1, cache write 1.25 (5m) or 2 (1h), cache
 read 0.1, output 5.
 
-Bench spend so far: $17.32 + the tells batch (estimates are logged before each batch; actuals after).
+Bench spend so far: $26.6 (estimates are logged before each batch; actuals after).
 
 ## Iteration 1 (2026-10-03): price what sits in context
 
@@ -196,6 +196,31 @@ settings screen, ADR, security review, fix + commit) on the fixture, Sonnet,
 Also added a bootstrap 90% CI to analyze.py. The published Haiku result
 (v2 -11%) has a CI of -33% to +19%, so it is not significant; RESULTS.md
 now says so. The Sonnet v2 result holds (-31% to -11%).
+
+Result ($8.44 + $0.83 rerun). Sonnet 5.5 output is close to tell-free on
+the regex detector in every arm: total hits over 18 documents per arm were
+ts 11, v2 4, v2s 18, v2t 3. Pass 18/18 in each arm; mean cost
+$0.112-0.120. One landing page inspected by hand: warm neutral palette, no
+gradients, specific headings. The remaining tells there (fragment
+marketing headings) need a reader, not a regex.
+
+The model invoked no skill in any run (tools were only Bash, Read, Write),
+so `v2s` differs from `v2` only by the skill listing in the prompt. Its 18
+hits were mostly bold-label bullets, and the skills themselves were written
+in bold-label bullets and em dashes, so I rewrote all skill bodies without
+them. Rerun on the prose tasks: 8 hits vs 16 before, v2 2; per-run counts
+range 0-6, so this is noise at n=9.
+
+Decisions: tells gate parked (nothing to catch on Sonnet's bench output; on
+this machine's interactive history it would fire on 40% of doc writes, so
+the place to test it is Opus interactive-style tasks). Skill text cleanup
+shipped (no cost, removes the contradiction). Anti-tell skills can't be the
+enforcement path because they aren't loaded unprompted.
+
+Next for tells: an LLM-judge pass with human references, since regex hits
+are at the floor for Sonnet.
+
+Stop-rule count: iterations 4 and 5 shipped nothing measurable.
 
 ## Queue (expected % of bill x confidence / cost to test)
 

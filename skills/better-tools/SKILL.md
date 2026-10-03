@@ -13,7 +13,7 @@ Installed at `{{TOOLS_ROOT}}`. Signatures below; never call `--help`.
 | better-context | Search + surrounding source in one call | `python3 {{TOOLS_ROOT}}/better-context/better_context.py QUERY... [--path P] [--type EXT] [--max-hits N] [--context-lines N] [--max-output-chars N]` |
 | better-grep | Ranked repo code search | `python3 {{TOOLS_ROOT}}/better-grep/better_grep.py QUERY... [--path P] [--type EXT] [--max-results N]` |
 | better-cat | Bounded file ranges (`path`, `path:12-40`, `path:12`) | `python3 {{TOOLS_ROOT}}/better-cat/better_cat.py SPEC... [--max-output-chars N]` |
-| better-edit | Batch exact-string edits, atomic | `python3 {{TOOLS_ROOT}}/better-edit/better_edit.py [EDITS_JSON]` — JSON array of `{path, old, new, replace_all?}` or stdin |
+| better-edit | Batch exact-string edits, atomic | `python3 {{TOOLS_ROOT}}/better-edit/better_edit.py [EDITS_JSON]`: JSON array of `{path, old, new, replace_all?}` or stdin |
 | better-find | Find files, bounded results | `python3 {{TOOLS_ROOT}}/better-find/better_find.py [PATH] [--name GLOB] [--type f\|d]` |
 | better-tree | Bounded directory tree | `python3 {{TOOLS_ROOT}}/better-tree/better_tree.py [PATH] [--depth N] [--max-entries N] [--hidden]` |
 | better-blame | Compact git blame | `python3 {{TOOLS_ROOT}}/better-blame/better_blame.py PATH [-L START,END] [-r REV]` |

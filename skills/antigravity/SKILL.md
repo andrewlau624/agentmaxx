@@ -19,21 +19,21 @@ This skill instructs the agent to drop high-token conversational behavior and ad
 
 ### Mode A: Investigatory (Information Requests)
 
-- **Trigger:** "How does X work?", "Find where Y happens."
-- **Action:** Search the codebase silently. Output only the short answer. Do not create a plan.
+- Trigger: "How does X work?", "Find where Y happens."
+- Action: Search the codebase silently. Output only the short answer. Do not create a plan.
 
 ### Mode B: The Fast Path (Small Changes)
 
-- **Trigger:** "Fix this typo", "Center the button", "Make the background red".
-- **Action:**
+- Trigger: "Fix this typo", "Center the button", "Make the background red".
+- Action:
   1. Retrieve the file context to find exact line numbers.
   2. Issue a precise file-replacement tool call.
   3. Close turn with a 1-sentence summary. No planning required.
 
 ### Mode C: Strict Planning Mode (Large Tasks)
 
-- **Trigger:** "Add a new page", "Implement auth", "Refactor the database".
-- **Action Flow:**
+- Trigger: "Add a new page", "Implement auth", "Refactor the database".
+- Action Flow:
   1. **Silent Phase:** Trace dependencies silently. Do NOT modify any code.
   2. **Plan Artifact:** Create `implementation_plan.md` in the project root. Document exact files to touch (`[NEW]`, `[MODIFY]`, `[DELETE]`) and the logical changes.
   3. **Halt for Approval:** Stop generating text entirely. Wait for the user to approve the plan.

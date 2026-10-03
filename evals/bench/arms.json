@@ -85,5 +85,15 @@
    "arms/v2t_settings.json": ".claude/settings.json"
   },
   "skills": true
+ },
+ "v2s2": {
+  "env": {
+   "ENABLE_TOOL_SEARCH": "true"
+  },
+  "files": {
+   "{AMX}/templates/CLAUDE.md": "CLAUDE.md",
+   "arms/v2_settings.json": ".claude/settings.json"
+  },
+  "skills": true
  }
 }

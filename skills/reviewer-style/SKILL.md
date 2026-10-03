@@ -5,7 +5,7 @@ description: Scrape a GitHub reviewer's historical review comments and distill t
 
 # Reviewer style scraping
 
-Turn a reviewer's past comments into the style file `code-review` enforces. One scrape, one distilled standard — the reviewer's opinions become `must-fix`/`nit`/`never-flag` rules instead of a pile of one-off threads.
+Turn a reviewer's past comments into the style file `code-review` enforces. One scrape, one distilled standard; the reviewer's opinions become `must-fix`/`nit`/`never-flag` rules instead of a pile of one-off threads.
 
 ## Workflow
 
@@ -31,7 +31,7 @@ Turn a reviewer's past comments into the style file `code-review` enforces. One 
      done >> /tmp/rev-comments.txt
    ```
 
-   Scope to feature PRs (`select(.pull_request)`) — release/CI/version PRs carry noise, not style.
+   Scope to feature PRs (`select(.pull_request)`); release/CI/version PRs carry noise, not style.
 
 2. **Cluster** the comments by the concern they name. Read the full set, then group recurring themes:
 
@@ -42,7 +42,7 @@ Turn a reviewer's past comments into the style file `code-review` enforces. One 
    - `how does this scale` / `cache this` → must-fix when the answer is "it doesn't"
    - `should have a protocol` → nit (shared abstraction)
 
-   A comment that names a *different* rule than the thread it's on is a real concern, not a mis-click. A comment that is only a question ("is this correct?") with no stated preference is not a rule — skip it.
+   A comment that names a *different* rule than the thread it's on is a real concern, not a mis-click. A comment that is only a question ("is this correct?") with no stated preference is not a rule; skip it.
 
 3. **Write** the distilled standard to `~/.config/agentmaxx/review-style.md` (create if missing), in the format `code-review` reads:
 
@@ -64,13 +64,13 @@ Turn a reviewer's past comments into the style file `code-review` enforces. One 
    - one generalized rule per recurring comment theme
    ```
 
-   Rules go under `## Probation` first, same as `code-review`'s own growth brake — they promote only after firing again. Keep it under 40 lines; merge duplicates.
+   Rules go under `## Probation` first, same as `code-review`'s own growth brake; they promote only after firing again. Keep it under 40 lines; merge duplicates.
 
 4. **Confirm** with one line: `scraped <n> comments from <user> → saved <k> rules to review-style.md`.
 
 ## Notes
 
-- The target file is the same one `code-review` reads, so after this skill runs, every review enforces the scraped style automatically — no second hop.
+- The target file is the same one `code-review` reads, so after this skill runs, every review enforces the scraped style automatically; no second hop.
 - Prefer the reviewer's *stated rule* over the incident. "we should have a protocol for crawl as well?" becomes "prefer shared protocols for cross-connector behavior", not "Jonathan wanted a crawl protocol in 5437".
-- If the reviewer's threads already have "Fixed in …" replies, the fix is the rule, not the complaint — the concern that *needed* fixing is the one to record.
+- If the reviewer's threads already have "Fixed in …" replies, the fix is the rule, not the complaint; the concern that *needed* fixing is the one to record.
 - `gh` is the only external dependency; if it is not authenticated, fail explicitly with the command to run, never fabricate a style.

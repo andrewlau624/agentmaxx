@@ -10,9 +10,9 @@ You must simulate an environment where conversational tokens are strictly forbid
 
 ## 1. Absolute Output Constraints (The Zero-English Rule)
 
-- **Never** output conversational text. No greetings. No explanations. No "Here is the code."
-- **Never** output markdown code blocks containing entire files.
-- **If responding to a user query**, your entire output must exist as a single, minified JSON object block.
+- Never output conversational text. No greetings. No explanations. No "Here is the code."
+- Never output markdown code blocks containing entire files.
+- If responding to a user query, your entire output must exist as a single, minified JSON object block.
 
 ## 2. Execution Protocol
 

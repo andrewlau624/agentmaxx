@@ -18,13 +18,13 @@ Inventing UI is how agents produce beautiful interfaces that look nothing like t
 
    Look for: component library directories (`components/ui/`, `packages/ui`), token sources (`tailwind.config`, `theme.ts`, `tokens.css`, CSS custom properties), installed kits in `package.json` (shadcn, Radix, MUI, Chakra, Ant, Mantine), Storybook stories, and one or two existing screens that show the house style.
 
-2. **Map requirements to what exists.** For each UI element you're about to build: reuse an existing component, compose several, or — only when nothing composes — build new following the system's conventions (file location, prop patterns, styling approach).
+2. **Map requirements to what exists.** For each UI element you're about to build: reuse an existing component, compose several, or, only when nothing composes, build new following the system's conventions (file location, prop patterns, styling approach).
 
 3. **Token discipline.** Never hardcode values the system already names. No hex colors duplicating palette entries, no magic pixel spacings off-scale, no ad-hoc radii or shadows. If a needed value genuinely doesn't exist as a token, that's a design-system decision: add it to the token source once, then use it everywhere.
 
-4. **Match interaction reality.** Every state the app's other components handle, yours handles too: hover, focus-visible, active, disabled, loading, error, empty. Agents notoriously ship only the happy path — the loading/error/empty trio is where homemade components get caught.
+4. **Match interaction reality.** Every state the app's other components handle, yours handles too: hover, focus-visible, active, disabled, loading, error, empty. Agents notoriously ship only the happy path; the loading/error/empty trio is where homemade components get caught.
 
-5. **Consistency checks** against neighboring screens: same breakpoints, same page padding rhythm, same icon set, same heading hierarchy. Dark mode if the app supports it — grep for `dark:` or `.dark` to know.
+5. **Consistency checks** against neighboring screens: same breakpoints, same page padding rhythm, same icon set, same heading hierarchy. Dark mode if the app supports it; grep for `dark:` or `.dark` to know.
 
 6. **Accessibility floor** (non-negotiable): semantic elements over div-soup, labeled form controls, visible focus states, hit targets ≥ 40px on touch, contrast ≥ WCAG AA, respect `prefers-reduced-motion` for animation.
 
@@ -41,11 +41,11 @@ Say so explicitly, then follow fundamentals so the code you write becomes the se
 
 Models regress to the statistical mean of their training data, and UI training data is saturated with one aesthetic: the Tailwind-indigo SaaS template. These specific patterns *are* that mean. Each is survivable alone; stacked, they're a machine-made fingerprint.
 
-- **Color:** indigo→violet gradients (`#6366F1` / `#8B5CF6`), `bg-clip-text` gradient headlines, default `blue-600` buttons, timid evenly-spread palettes with no dominant color, untouched shadcn zinc/slate.
-- **Type:** Inter or Roboto as the only face, Space Grotesk chosen as if it were a decision, serif-italic accent word on a sans page, all-caps section labels everywhere, decorative monospace.
-- **Layout:** the skeleton of centered hero + sparkle badge pill + exactly three feature cards (icon, heading, two lines) + CTA; four-column footer; zero asymmetry anywhere; uniform `gap-4` / `p-6` with no spatial hierarchy.
-- **Components:** `rounded-2xl shadow-lg p-6` shadcn card untouched; the colored left-border strip (the single most reliable tell); glassmorphism by reflex (`backdrop-blur` + white-alpha + glow) regardless of what sits behind it; icon-in-rounded-square; cards nested inside cards.
-- **Details:** lucide `Sparkles`/`Zap` defaults, emoji as feature icons, the same fade-in-up on every element or bounce on every hover, CTA contrast below 4.5:1.
+- Color: indigo→violet gradients (`#6366F1` / `#8B5CF6`), `bg-clip-text` gradient headlines, default `blue-600` buttons, timid evenly-spread palettes with no dominant color, untouched shadcn zinc/slate.
+- Type: Inter or Roboto as the only face, Space Grotesk chosen as if it were a decision, serif-italic accent word on a sans page, all-caps section labels everywhere, decorative monospace.
+- Layout: the skeleton of centered hero + sparkle badge pill + exactly three feature cards (icon, heading, two lines) + CTA; four-column footer; zero asymmetry anywhere; uniform `gap-4` / `p-6` with no spatial hierarchy.
+- Components: `rounded-2xl shadow-lg p-6` shadcn card untouched; the colored left-border strip (the single most reliable tell); glassmorphism by reflex (`backdrop-blur` + white-alpha + glow) regardless of what sits behind it; icon-in-rounded-square; cards nested inside cards.
+- Details: lucide `Sparkles`/`Zap` defaults, emoji as feature icons, the same fade-in-up on every element or bounce on every hover, CTA contrast below 4.5:1.
 
 Countermeasures that actually work: commit to one direction and carry it through (a dominant color with a sharp accent beats any timid gradient); pick a typeface pairing deliberately and name why; introduce asymmetry where content allows; let motion serve one or two key moments instead of every element; measure contrast instead of eyeballing it.
 

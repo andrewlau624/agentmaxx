@@ -263,8 +263,8 @@ Include why a file matters when the relationship is not obvious.
 Prefer:
 
 ```text
-src/auth/middleware.ts — authentication boundary.
-tests/auth/expired_token.test.ts — currently failing test.
+src/auth/middleware.ts: authentication boundary.
+tests/auth/expired_token.test.ts: currently failing test.
 ```
 
 Over a long list of every file touched during the session.
@@ -278,9 +278,9 @@ Include the check and its result.
 Examples:
 
 ```text
-better-test tests/auth/ — passing
-better-lint src/auth/ — passing
-better-check — failing: expired-token integration test
+better-test tests/auth/: passing
+better-lint src/auth/: passing
+better-check: failing: expired-token integration test
 ```
 
 Never claim that a test, lint check, build, or other verification passed unless it was actually performed.
