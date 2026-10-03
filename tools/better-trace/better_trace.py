@@ -42,18 +42,17 @@ def find_callers(
     # Search for function calls
     pattern = rf"\b{re.escape(function)}\s*\("
     
+    error = None
     try:
         found = better_grep.search(
             query=[pattern],
             path=path,
             max_results=max_results,
         )
-        if found and "results" in found:
-            results = found["results"]
-        else:
-            results = []
-    except Exception:
-        results = []
+        results = found.get("results", []) if found else []
+    except Exception as exc:
+        # An empty caller list would read as "nothing calls this"; say why instead.
+        results, error = [], str(exc)
     
     # Group by file
     by_file = defaultdict(list)
@@ -66,7 +65,8 @@ def find_callers(
         "function": function,
         "callers": dict(by_file),
         "depth": 1,
-        "total_found": len(found),
+        "total_found": len(results),
+        **({"error": error} if error else {}),
     }
 
 

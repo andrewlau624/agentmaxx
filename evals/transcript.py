@@ -61,8 +61,12 @@ def parse_session(path: Path) -> SessionUsage:
 
     Streams the file line by line: transcripts routinely run to hundreds
     of megabytes, so nothing here may load one whole.
+
+    Claude Code writes one line per content block, and each line repeats
+    its API response's full usage. Counting lines double counts (2-3x on
+    real transcripts), so usage is kept per message id and summed once.
     """
-    raw = cache_write = cache_read = output = turns = 0
+    by_message: dict[str, dict] = {}
 
     with path.open() as handle:
         for line in handle:
@@ -89,11 +93,15 @@ def parse_session(path: Path) -> SessionUsage:
             if not isinstance(usage, dict):
                 continue
 
-            turns += 1
-            raw += usage.get("input_tokens") or 0
-            cache_write += usage.get("cache_creation_input_tokens") or 0
-            cache_read += usage.get("cache_read_input_tokens") or 0
-            output += usage.get("output_tokens") or 0
+            key = message.get("id") or entry.get("uuid") or f"line-{len(by_message)}"
+            by_message[key] = usage
+
+    usages = by_message.values()
+    turns = len(by_message)
+    raw = sum(u.get("input_tokens") or 0 for u in usages)
+    cache_write = sum(u.get("cache_creation_input_tokens") or 0 for u in usages)
+    cache_read = sum(u.get("cache_read_input_tokens") or 0 for u in usages)
+    output = sum(u.get("output_tokens") or 0 for u in usages)
 
     return SessionUsage(
         session=path.stem,

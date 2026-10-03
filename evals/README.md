@@ -1,5 +1,24 @@
 # Evals
 
+Measurement, not tooling: nothing here is installed into an agent's toolbelt.
+Results and method: [RESULTS.md](RESULTS.md).
+
+| Script | What it answers |
+|---|---|
+| `doctor.py` (`agentmaxx doctor`) | Where this machine's tokens go, and which settings would move them |
+| `token_telemetry.py` (`make telemetry`) | Per-session tokens and API-equivalent cost, all providers |
+| `bench/run.py` | Live A/B: real `claude -p` runs on a fixture repo, graded by hidden tests |
+| `bench/learn.py` | Does a correction in one session change the next session? |
+| `python3 -m evals` | Weighted-cost comparison of two sets of existing transcripts |
+
+`bench/` spends real tokens (~$0.05-0.15 per Sonnet run) and isolates runs
+with `--setting-sources project,local`, so your own hooks and plugins don't
+leak in. Arms live in `bench/arms.json`; add one and run
+`python3 evals/bench/run.py base yourarm --reps 3`, then
+`python3 evals/bench/analyze.py evals/bench/results.jsonl base`.
+
+## Comparing existing transcripts
+
 Scores two A/B arms of Claude Code transcripts by weighted token cost.
 
 This is a **test utility, not a tool**. It has no `registry.yaml` entry, is not

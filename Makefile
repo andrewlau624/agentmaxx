@@ -1,4 +1,4 @@
-.PHONY: install stage test telemetry prune
+.PHONY: install stage test telemetry prune doctor
 
 AGENTMAXX = $(HOME)/.agentmaxx/agentmaxx.py
 
@@ -20,7 +20,7 @@ stage:
 	}
 	@rm -rf "$(HOME)/.agentmaxx"
 	@mkdir -p "$(HOME)/.agentmaxx"
-	@cp -R agentmaxx.py providers skills templates tools integrations mcp \
+	@cp -R agentmaxx.py providers skills templates tools hooks integrations mcp evals \
 		"$(HOME)/.agentmaxx/"
 	@find "$(HOME)/.agentmaxx" -name __pycache__ -type d -prune -exec rm -rf {} +
 	@mkdir -p "$(HOME)/.local/bin"
@@ -42,9 +42,13 @@ install-%: stage
 test:
 	python3 -m unittest discover -s tools -p "test_*.py"
 	python3 -m unittest discover -s evals -p "test_*.py" -t .
+	python3 -m unittest discover -s hooks -p "test_*.py"
 
 telemetry:
 	python3 evals/token_telemetry.py
 
 prune:
 	python3 external/prune_gstack.py
+
+doctor:
+	python3 evals/doctor.py

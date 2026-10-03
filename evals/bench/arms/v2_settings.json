@@ -1,0 +1,50 @@
+{
+ "hooks": {
+  "PreToolUse": [
+   {
+    "matcher": "Bash|Read|Write|Edit|MultiEdit",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "python3 {AMX}/hooks/guard.py",
+      "timeout": 10
+     }
+    ]
+   }
+  ],
+  "PostToolUse": [
+   {
+    "matcher": "Bash",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "python3 {AMX}/hooks/squeeze.py",
+      "timeout": 20
+     }
+    ]
+   }
+  ],
+  "Stop": [
+   {
+    "hooks": [
+     {
+      "type": "command",
+      "command": "python3 {AMX}/hooks/verify.py",
+      "timeout": 180
+     }
+    ]
+   }
+  ],
+  "SessionStart": [
+   {
+    "hooks": [
+     {
+      "type": "command",
+      "command": "python3 {AMX}/hooks/verify.py",
+      "timeout": 10
+     }
+    ]
+   }
+  ]
+ }
+}

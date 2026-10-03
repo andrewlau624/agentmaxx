@@ -1,0 +1,6 @@
+{
+ "base": {"env": {"ENABLE_TOOL_SEARCH": "false"}},
+ "ts":   {"env": {"ENABLE_TOOL_SEARCH": "true"}},
+ "v1":   {"env": {"ENABLE_TOOL_SEARCH": "false"}, "files": {"arms/v1_CLAUDE.md": "CLAUDE.md"}, "mcp": true},
+ "v2":   {"env": {"ENABLE_TOOL_SEARCH": "true"}, "files": {"{AMX}/templates/CLAUDE.md": "CLAUDE.md", "arms/v2_settings.json": ".claude/settings.json"}}
+}

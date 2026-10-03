@@ -157,18 +157,64 @@ def _tool_result_bytes(content) -> int:
     return 0
 
 
+# $/MTok (input, output). Cache write = 1.25x input, cache read = 0.1x input.
+PRICES = {
+    "opus": (5.0, 25.0),
+    "fable": (10.0, 50.0),
+    "sonnet": (3.0, 15.0),
+    "haiku": (1.0, 5.0),
+}
+
+
+def price_usd(model: str, usage: dict) -> float:
+    family = next((f for f in PRICES if f in (model or "")), "sonnet")
+    rate_in, rate_out = PRICES[family]
+    write = usage.get("cache_creation_input_tokens", 0) or 0
+    cache = usage.get("cache_creation") or {}
+    write_1h = cache.get("ephemeral_1h_input_tokens", 0) or 0
+    return (
+        (usage.get("input_tokens", 0) or 0) * rate_in
+        + (write - write_1h) * rate_in * 1.25
+        + write_1h * rate_in * 2.0
+        + (usage.get("cache_read_input_tokens", 0) or 0) * rate_in * 0.1
+        + (usage.get("output_tokens", 0) or 0) * rate_out
+    ) / 1e6
+
+
 def load_claude(cutoff: float) -> list[dict]:
     """Parse Claude Code transcript JSONL files.
 
-    Assistant lines carry per-request usage; user lines carry tool_result
-    blocks whose text length approximates tool-result volume.
+    Claude Code writes one line per content block, and every line of one API
+    response repeats that response's full usage. Summing lines double counts
+    (2-3x in practice), so usage is keyed by message id and counted once.
+    Cost is computed from tokens: modern transcripts carry no costUSD.
     """
     if not CLAUDE_PROJECTS.is_dir():
         return []
 
     sessions: dict[str, dict] = {}
+    usage_by_msg: dict[str, dict[str, tuple]] = {}
+
+    def session_for(record: dict, path: Path, timestamp: float) -> tuple[str, dict]:
+        sid = record.get("sessionId") or path.stem
+        if path.parent.name == "subagents" or path.stem.startswith("agent-"):
+            sid = f"{sid}:{path.stem}"
+        session = sessions.get(sid)
+        if session is None:
+            project = path.parent.parent.name if path.parent.name == "subagents" else path.parent.name
+            session = new_session(
+                "claude",
+                project.rsplit("-", 1)[-1],
+                time_updated=timestamp,
+                subagent=path.parent.name == "subagents" or path.stem.startswith("agent-"),
+            )
+            sessions[sid] = session
+            usage_by_msg[sid] = {}
+        return sid, session
 
     for path in CLAUDE_PROJECTS.rglob("*.jsonl"):
+        if path.stat().st_mtime < cutoff:
+            continue
         for line in path.open(errors="ignore"):
             try:
                 record = json.loads(line)
@@ -183,39 +229,18 @@ def load_claude(cutoff: float) -> list[dict]:
             record_type = record.get("type")
 
             if record_type == "assistant":
-                sid = record.get("sessionId") or path.stem
-                session = sessions.get(sid)
-                if session is None:
-                    session = new_session(
-                        "claude",
-                        path.parent.name.rsplit("-", 1)[-1],
-                        time_updated=timestamp,
-                    )
-                    sessions[sid] = session
+                sid, session = session_for(record, path, timestamp)
                 session["time_updated"] = max(session["time_updated"], timestamp)
-                session["turns"] += 1
-
-                usage = message.get("usage") or {}
-                session["tokens_input"] += usage.get("input_tokens", 0) or 0
-                session["tokens_output"] += usage.get("output_tokens", 0) or 0
-                session["tokens_cache_read"] += (
-                    usage.get("cache_read_input_tokens", 0) or 0
+                msg_id = message.get("id") or record.get("uuid")
+                usage_by_msg[sid][msg_id] = (
+                    message.get("model") or "",
+                    message.get("usage") or {},
                 )
-                session["tokens_cache_write"] += (
-                    usage.get("cache_creation_input_tokens", 0) or 0
-                )
-                session["cost"] += record.get("costUSD") or 0.0
+                if message.get("model"):
+                    session["model"] = message["model"]
 
             elif record_type == "user":
-                sid = record.get("sessionId") or path.stem
-                session = sessions.get(sid)
-                if session is None:
-                    session = new_session(
-                        "claude",
-                        path.parent.name.rsplit("-", 1)[-1],
-                        time_updated=timestamp,
-                    )
-                    sessions[sid] = session
+                _, session = session_for(record, path, timestamp)
                 content = message.get("content")
                 if isinstance(content, list):
                     for block in content:
@@ -227,7 +252,24 @@ def load_claude(cutoff: float) -> list[dict]:
                                 block.get("content")
                             )
 
-    return list(sessions.values())
+    for sid, session in sessions.items():
+        contexts = []
+        for model, usage in usage_by_msg[sid].values():
+            session["turns"] += 1
+            session["tokens_input"] += usage.get("input_tokens", 0) or 0
+            session["tokens_output"] += usage.get("output_tokens", 0) or 0
+            session["tokens_cache_read"] += usage.get("cache_read_input_tokens", 0) or 0
+            session["tokens_cache_write"] += usage.get("cache_creation_input_tokens", 0) or 0
+            session["cost"] += price_usd(model, usage)
+            contexts.append(
+                (usage.get("input_tokens", 0) or 0)
+                + (usage.get("cache_read_input_tokens", 0) or 0)
+                + (usage.get("cache_creation_input_tokens", 0) or 0)
+            )
+        session["first_context"] = contexts[0] if contexts else 0
+        session["median_context"] = sorted(contexts)[len(contexts) // 2] if contexts else 0
+
+    return [s for s in sessions.values() if s["turns"]]
 
 
 # ------------------------------------------------------------------- codex
@@ -356,15 +398,21 @@ def print_table(sessions: list[dict], days: int) -> None:
         f"{totals['cost']:>8.2f}"
     )
 
-    uncached = totals["tokens_input"] + totals["output"]
-    cached = totals["tokens_cache_read"]
-    if uncached + cached > 0:
-        hit_rate = cached / (cached + uncached) * 100
+    reads, writes = totals["tokens_cache_read"], totals["tokens_cache_write"]
+    prompt = reads + writes + totals["tokens_input"]
+    if prompt:
+        firsts = sorted(s.get("first_context", 0) for s in sessions if s.get("first_context"))
+        medians = sorted(s.get("median_context", 0) for s in sessions if s.get("median_context"))
         print(
-            f"\ncache hit rate {hit_rate:.0f}%   "
+            f"\ncache hit rate {reads / prompt * 100:.0f}% of prompt tokens   "
             f"tool results {totals['tool_result_bytes'] / 1024 / 1024:.1f} MB   "
             f"({len(sessions)} sessions, last {days}d)"
         )
+        if firsts:
+            print(
+                f"fixed prefix (first request) median {firsts[len(firsts) // 2]:,} tok   "
+                f"per-session median context, median across sessions {medians[len(medians) // 2]:,} tok"
+            )
 
 
 def main() -> int:

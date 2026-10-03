@@ -1,0 +1,95 @@
+"""A/B benchmark: real headless Claude Code runs on a fixture repo, graded by hidden tests.
+
+    python3 evals/bench/run.py base v2 --reps 3 [--model claude-sonnet-5-5] [--tasks t1_bugfix,...]
+    python3 evals/bench/analyze.py evals/bench/results.jsonl base
+
+Each run copies fixture/ into a fresh git repo, applies the arm (rules file,
+.claude/settings.json, env), runs `claude -p` with --setting-sources
+project,local so your own hooks/plugins don't leak in, then grades the
+result with the task's hidden test (never visible to the agent). Spends
+real tokens: ~$0.05-0.15 per run on Sonnet.
+"""
+import argparse, json, os, shutil, subprocess, tempfile, time, glob, re, concurrent.futures as cf
+B = os.path.dirname(os.path.abspath(__file__))
+AMX = os.path.dirname(os.path.dirname(B))
+TASKS = json.load(open(f"{B}/tasks.json"))
+ARMS = json.load(open(f"{B}/arms.json"))
+
+def fill(text):
+    return text.replace("{AMX}", AMX).replace("{BENCH}", B).replace("{{TOOLS_ROOT}}", f"{AMX}/tools")
+
+def setup(arm, d):
+    a = ARMS[arm]
+    subprocess.run("git init -q", shell=True, cwd=d)
+    for src, dst in a.get("files", {}).items():
+        dst = os.path.join(d, dst); os.makedirs(os.path.dirname(dst), exist_ok=True)
+        open(dst, "w").write(fill(open(os.path.join(B, fill(src))).read()))
+    if a.get("mcp"):
+        json.dump({"mcpServers": {"agentmaxx": {"command": "python3", "args": [f"{AMX}/mcp/better_mcp.py"]}}},
+                  open(f"{d}/.mcp-arm.json", "w"))
+    subprocess.run("git add -A && git -c user.email=b@b -c user.name=b commit -qm arm --allow-empty", shell=True, cwd=d)
+
+def grade(task, d, result_text):
+    t = TASKS[task]
+    if "answer" in t:
+        m = re.findall(r"CODES:\s*(.*)", result_text or "")
+        got = {c.strip().strip("`*").upper() for c in (m[-1].split(",") if m else []) if c.strip()}
+        clean = subprocess.run("git status --porcelain", shell=True, cwd=d, capture_output=True, text=True).stdout.strip()
+        return got == {t["answer"]} and not [l for l in clean.splitlines() if not l.endswith(".pyc") and "__pycache__" not in l]
+    shutil.copy(f"{B}/hidden/{t['hidden']}", f"{d}/tests/hidden_{t['hidden']}")
+    r = subprocess.run(["python3", "-m", "unittest", f"tests.hidden_{t['hidden'][:-3]}"], cwd=d, capture_output=True, text=True, timeout=60)
+    base = subprocess.run(["python3", "-m", "unittest", "tests.test_basic.TestOrders.test_simple_total", "tests.test_basic.TestOrders.test_untaxed_books"], cwd=d, capture_output=True, text=True, timeout=60)
+    return r.returncode == 0 and base.returncode == 0
+
+def transcript_stats(session_id):
+    files = glob.glob(os.path.expanduser(f"~/.claude/projects/*/{session_id}.jsonl"))
+    tool_bytes = 0; tools = {}; peak = 0
+    for f in files:
+        reqs = {}
+        for l in open(f, errors="ignore"):
+            r = json.loads(l); m = r.get("message") or {}
+            if r.get("type") == "assistant":
+                u = m.get("usage") or {}; reqs[m.get("id")] = u
+                for b in m.get("content") or []:
+                    if isinstance(b, dict) and b.get("type") == "tool_use": tools[b["name"]] = tools.get(b["name"], 0) + 1
+            if r.get("type") == "user" and isinstance(m.get("content"), list):
+                for b in m["content"]:
+                    if isinstance(b, dict) and b.get("type") == "tool_result":
+                        c = b.get("content"); tool_bytes += len(c) if isinstance(c, str) else sum(len(x.get("text", "")) for x in c or [] if isinstance(x, dict))
+        for u in reqs.values():
+            peak = max(peak, (u.get("input_tokens") or 0) + (u.get("cache_read_input_tokens") or 0) + (u.get("cache_creation_input_tokens") or 0))
+    return tool_bytes, tools, peak
+
+def one(arm, task, rep, model):
+    a = ARMS[arm]; d = tempfile.mkdtemp(prefix=f"amx-{arm}-{task}-")
+    shutil.copytree(f"{B}/fixture", d, dirs_exist_ok=True); setup(arm, d)
+    env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_BASE_URL",)}
+    env.update(a.get("env", {})); env["AGENTMAXX_HOME"] = tempfile.mkdtemp(prefix="amx-home-")
+    cmd = ["claude", "-p", TASKS[task]["prompt"], "--model", model, "--output-format", "json",
+           "--setting-sources", "project,local", "--permission-mode", "bypassPermissions"] + (["--mcp-config", f"{d}/.mcp-arm.json"] if a.get("mcp") else [])
+    t0 = time.time()
+    p = subprocess.run(cmd, cwd=d, env=env, capture_output=True, text=True, timeout=1500, stdin=subprocess.DEVNULL)
+    dt = time.time() - t0
+    try: j = json.loads(p.stdout)
+    except Exception: j = {"is_error": True, "result": p.stdout[-500:] + p.stderr[-500:]}
+    mu = j.get("modelUsage") or {}
+    tot = {"in": 0, "cw": 0, "cr": 0, "out": 0}
+    for m, u in mu.items():
+        tot["in"] += u.get("inputTokens", 0); tot["cw"] += u.get("cacheCreationInputTokens", 0)
+        tot["cr"] += u.get("cacheReadInputTokens", 0); tot["out"] += u.get("outputTokens", 0)
+    tb, tools, peak = transcript_stats(j.get("session_id", "none"))
+    ok = grade(task, d, j.get("result", ""))
+    rec = dict(arm=arm, task=task, rep=rep, model=model, ok=ok, cost=j.get("total_cost_usd", 0), turns=j.get("num_turns"),
+               secs=round(dt), tool_bytes=tb, peak_ctx=peak, tools=tools, err=j.get("is_error"), **tot,
+               wcost=tot["in"] + 1.25 * tot["cw"] + 0.1 * tot["cr"] + 5 * tot["out"], dir=d)
+    with open(f"{B}/results.jsonl", "a") as fh: fh.write(json.dumps(rec) + "\n")
+    print(arm, task, rep, "OK" if ok else "FAIL", f"${rec['cost']:.3f}", rec["turns"], "turns", flush=True)
+    return rec
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser(); ap.add_argument("arms", nargs="+"); ap.add_argument("--reps", type=int, default=3)
+    ap.add_argument("--model", default="claude-sonnet-5-5"); ap.add_argument("--jobs", type=int, default=4); ap.add_argument("--tasks", default=",".join(TASKS))
+    a = ap.parse_args()
+    jobs = [(arm, t, r) for r in range(a.reps) for t in a.tasks.split(",") for arm in a.arms]
+    with cf.ThreadPoolExecutor(a.jobs) as ex:
+        list(ex.map(lambda x: one(*x, a.model), jobs))

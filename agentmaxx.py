@@ -106,12 +106,23 @@ def main() -> None:
         help="Initialize a specific provider.",
     )
 
+    subparsers.add_parser(
+        "doctor",
+        help="Show where your Claude Code tokens go and what to change.",
+    )
+
     args = parser.parse_args()
 
     if args.command == "install":
         install_global(args.provider)
     elif args.command == "init":
         init(args.provider)
+    elif args.command == "doctor":
+        import runpy
+        import sys
+
+        sys.argv = [sys.argv[0]]
+        runpy.run_path(str(ROOT / "evals" / "doctor.py"), run_name="__main__")
 
 
 if __name__ == "__main__":

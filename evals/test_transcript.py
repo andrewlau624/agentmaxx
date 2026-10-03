@@ -46,6 +46,21 @@ class TestParseSession(unittest.TestCase):
         self.assertEqual(usage.cache_read, 600)
         self.assertEqual(usage.output, 15)
 
+    def test_counts_each_api_response_once(self):
+        # Claude Code writes one line per content block (thinking, text,
+        # tool_use), each repeating the same response's usage.
+        usage = {"input_tokens": 1, "cache_read_input_tokens": 1000, "output_tokens": 50}
+        lines = [{"message": {"id": "msg_a", "usage": usage}}] * 3 + [
+            {"message": {"id": "msg_b", "usage": usage}}
+        ]
+        self.path.write_text("\n".join(json.dumps(line) for line in lines) + "\n")
+
+        session = parse_session(self.path)
+
+        self.assertEqual(session.turns, 2)
+        self.assertEqual(session.cache_read, 2000)
+        self.assertEqual(session.output, 100)
+
     def test_ignores_lines_without_usage(self):
         self.path.write_text(
             json.dumps({"message": {"content": []}}) + "\n"

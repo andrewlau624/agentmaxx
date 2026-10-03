@@ -1,0 +1,18 @@
+{"arm": "lessons", "rep": 1, "scenario": "commit", "s1": false, "s1_after_fix": true, "s2": true, "lesson": "- [L1 h=0 x=0 2026-10-03] Commit finished work yourself when a task is done, with a commit message starting with 'shopkit: '.", "cost": 0.267879, "s2_cost": 0.09516339999999998}
+{"arm": "lessons", "rep": 0, "scenario": "commit", "s1": false, "s1_after_fix": true, "s2": true, "lesson": "- [L1 h=0 x=0 2026-10-03] Commit finished work yourself when a task is done, with a commit message starting with 'shopkit: '.", "cost": 0.2910222, "s2_cost": 0.09232200000000002}
+{"arm": "nolessons", "rep": 1, "scenario": "commit", "s1": false, "s1_after_fix": true, "s2": false, "lesson": "", "cost": 0.263228, "s2_cost": 0.095659}
+{"arm": "nolessons", "rep": 0, "scenario": "commit", "s1": false, "s1_after_fix": true, "s2": false, "lesson": "", "cost": 0.3349382, "s2_cost": 0.09585699999999998}
+{"arm": "lessons", "rep": 3, "scenario": "commit", "s1": false, "s1_after_fix": true, "s2": true, "lesson": "- [L1 h=0 x=0 2026-10-03] Commit finished work yourself when a task is done; commit messages must start with 'shopkit: '.", "cost": 0.2576792, "s2_cost": 0.113009}
+{"arm": "nolessons", "rep": 2, "scenario": "commit", "s1": false, "s1_after_fix": true, "s2": false, "lesson": "", "cost": 0.3133302, "s2_cost": 0.093513}
+{"arm": "lessons", "rep": 2, "scenario": "commit", "s1": false, "s1_after_fix": true, "s2": true, "lesson": "- [L1 h=0 x=0 2026-10-03] Commit finished work yourself when a task is done; commit messages must start with 'shopkit: '.", "cost": 0.32000960000000006, "s2_cost": 0.08635200000000001}
+{"arm": "nolessons", "rep": 3, "scenario": "commit", "s1": false, "s1_after_fix": true, "s2": false, "lesson": "", "cost": 0.2987996, "s2_cost": 0.09467819999999999}
+{"arm": "lessons", "rep": 4, "scenario": "commit", "s1": false, "s1_after_fix": true, "s2": true, "lesson": "- [L1 h=0 x=0 2026-10-03] In this repo, commit finished work yourself when a task is done, with a commit message starting with 'shopkit: '.", "cost": 0.307511, "s2_cost": 0.0979116}
+{"arm": "nolessons", "rep": 4, "scenario": "commit", "s1": false, "s1_after_fix": true, "s2": false, "lesson": "", "cost": 0.2745844, "s2_cost": 0.09459}
+{"arm": "nolessons", "rep": 1, "s1_changelog": true, "s2_changelog": false, "lesson": "", "cost": 0.2363342, "s2_cost": 0.09453820000000002}
+{"arm": "lessons", "rep": 0, "s1_changelog": true, "s2_changelog": true, "lesson": "- [L1 h=0 x=0 2026-10-03] Every behavior change needs a one-line CHANGELOG.md entry under ## Unreleased.", "cost": 0.28977060000000004, "s2_cost": 0.08431880000000003}
+{"arm": "nolessons", "rep": 0, "s1_changelog": true, "s2_changelog": true, "lesson": "", "cost": 0.2962346, "s2_cost": 0.0986262}
+{"arm": "lessons", "rep": 1, "s1_changelog": true, "s2_changelog": true, "lesson": "- [L1 h=0 x=0 2026-10-03] Add a one-line CHANGELOG.md entry under ## Unreleased for every behavior change.", "cost": 0.3268742, "s2_cost": 0.0859712}
+{"arm": "lessons", "rep": 2, "s1_changelog": true, "s2_changelog": true, "lesson": "- [L1 h=0 x=0 2026-10-03] Every behavior change needs a one-line CHANGELOG.md entry under ## Unreleased.", "cost": 0.2675373999999999, "s2_cost": 0.08929479999999998}
+{"arm": "nolessons", "rep": 2, "s1_changelog": true, "s2_changelog": false, "lesson": "", "cost": 0.2800656, "s2_cost": 0.11670559999999999}
+{"arm": "nolessons", "rep": 3, "s1_changelog": true, "s2_changelog": true, "lesson": "", "cost": 0.2375178, "s2_cost": 0.09508}
+{"arm": "lessons", "rep": 3, "s1_changelog": true, "s2_changelog": true, "lesson": "- [L1 h=0 x=0 2026-10-03] Every behavior change needs a one-line CHANGELOG.md entry under ## Unreleased.", "cost": 0.28726140000000006, "s2_cost": 0.09043880000000001}

@@ -14,6 +14,7 @@ TOOLS_ROOT = Path(__file__).resolve().parent
 REPO_ROOT = TOOLS_ROOT.parent
 REGISTRY = TOOLS_ROOT / "registry.yaml"
 TEMPLATE = REPO_ROOT / "templates" / "CLAUDE.md"
+SKILL = REPO_ROOT / "skills" / "better-tools" / "SKILL.md"
 
 
 def tool_directories() -> set[str]:
@@ -91,18 +92,28 @@ class TestRegistryConsistency(unittest.TestCase):
 
 
 class TestTemplateConsistency(unittest.TestCase):
-    def test_template_documents_every_tool(self):
-        template = TEMPLATE.read_text()
+    """The tool table lives in an on-demand skill, not the resident contract.
+
+    Every contract byte is re-sent on every turn of every session; the skill
+    body loads only when the model reaches for the tools.
+    """
+
+    def test_skill_documents_every_tool(self):
+        template = SKILL.read_text()
 
         for name in tool_directories():
             with self.subTest(tool=name):
                 self.assertIn(name, template)
 
-    def test_template_uses_the_tools_root_placeholder(self):
+    def test_template_and_skill_use_the_tools_root_placeholder(self):
         self.assertIn("{{TOOLS_ROOT}}", TEMPLATE.read_text())
+        self.assertIn("{{TOOLS_ROOT}}", SKILL.read_text())
 
-    def test_template_forbids_help_calls(self):
-        self.assertIn("never call `--help`", TEMPLATE.read_text())
+    def test_skill_forbids_help_calls(self):
+        self.assertIn("never call `--help`", SKILL.read_text())
+
+    def test_contract_stays_small(self):
+        self.assertLess(len(TEMPLATE.read_text()), 3000)
 
 
 if __name__ == "__main__":

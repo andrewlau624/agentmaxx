@@ -1,0 +1,26 @@
+{
+ "t1_bugfix": {
+  "prompt": "Customers report that coupons don't reduce sales tax. Our policy: the coupon discount is applied to the taxable amount before tax is calculated (taxable amount can never go below zero). Fix shopkit so order totals follow this policy.",
+  "hidden": "test_t1.py"
+ },
+ "t2_feature": {
+  "prompt": "Add a `csv` output format to the shopkit report (both `render(..., 'csv')` and the CLI `--format csv`). Header row: order_id,region,subtotal,discount,tax,total, then one row per order.",
+  "hidden": "test_t2.py"
+ },
+ "t3_debug": {
+  "prompt": "The test suite (`python3 -m unittest discover -s tests -t .`) is failing. Find and fix the root cause in the library code; do not edit the tests.",
+  "hidden": "test_t3.py"
+ },
+ "t4_question": {
+  "prompt": "Do not modify any files. Which coupon codes would currently be accepted for an order with a $60.00 subtotal placed on 2026-10-03? End your answer with a final line of the form `CODES: <comma-separated codes>`.",
+  "answer": "SAVE10"
+ },
+ "t5_stacking": {
+  "prompt": "Support coupon stacking in shopkit. `coupon_code` may now hold several comma-separated codes (case-insensitive, whitespace ignored; a code repeated counts once; unknown or expired codes are ignored). Each coupon's validity (min_subtotal) is checked against the order's pre-discount subtotal. Apply all percent-off coupons first, in the order given, each to the amount remaining after previous coupons; then apply amount-off coupons. The total discount can never exceed the subtotal. A single code must behave as before.",
+  "hidden": "test_t5.py"
+ },
+ "t6_regions": {
+  "prompt": "Make order regions strict and normalized in shopkit: an Order's region is normalized to uppercase with surrounding whitespace stripped when the order is created (including orders loaded from JSON by the store), and an unknown region (not in the tax rate table) raises ValueError at creation. `tax.rate_for` should raise ValueError for unknown regions instead of returning 0. Reports must show the normalized region.",
+  "hidden": "test_t6.py"
+ }
+}

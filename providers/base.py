@@ -148,6 +148,11 @@ class Provider(ABC):
             self.source_root / "skills",
             self.global_root / "skills",
         )
+        for skill in (self.source_root / "skills").glob("*/SKILL.md"):
+            installed = self.global_root / "skills" / skill.parent.name / "SKILL.md"
+            text = installed.read_text()
+            if TOOLS_ROOT_PLACEHOLDER in text:
+                installed.write_text(text.replace(TOOLS_ROOT_PLACEHOLDER, str(self.tools_root)))
 
     def install_tools(self) -> None:
         # This directory is owned entirely by agentmaxx, so clearing it is
