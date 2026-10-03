@@ -45,6 +45,9 @@ def load(path: Path) -> dict | None:
             continue
         if r.get("isCompactSummary"):
             events.append(("compact", len(order)))
+        a = r.get("attachment") or {}
+        if a.get("type") == "skill_listing":
+            events.append(("skills", len(order), len(a.get("content") or "") / CHARS_PER_TOKEN))
         m = r.get("message") or {}
         if r.get("type") == "assistant":
             mid = m.get("id") or r.get("uuid")
@@ -55,6 +58,8 @@ def load(path: Path) -> dict | None:
             for b in m.get("content") or []:
                 if isinstance(b, dict) and b.get("type") == "tool_use":
                     uses[b.get("id")] = (b.get("name", "?"), b.get("input") or {})
+                    if b.get("name") == "Skill":
+                        events.append(("invoked", len(order), (b.get("input") or {}).get("skill")))
                     visible[mid] += len(json.dumps(b.get("input")))
                 elif isinstance(b, dict) and b.get("type") == "text":
                     visible[mid] += len(b.get("text", ""))

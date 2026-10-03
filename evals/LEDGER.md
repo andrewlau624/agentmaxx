@@ -241,6 +241,26 @@ Parked: routing subagents to a cheaper model (`CLAUDE_CODE_SUBAGENT_MODEL`)
 needs a bench where subagents do real work; the current tasks don't spawn
 any.
 
+## Iteration 8: fixed prefix
+
+`ENABLE_TOOL_SEARCH=true claude -p /context` on this machine: 17.1k at
+start. System prompt 1.3k, system tools 3.6k, MCP tools 0.8k (22.6k
+deferred), MCP instructions 0.8k, skills 10k (109 skills: user 7.6k,
+built-in 2.2k, claude.ai sync 0.5k, claude-mem 0.4k).
+
+The skill listing budget is a setting (verified in the 2.1.288 settings
+schema): `skillListingBudgetFraction`, default 0.01 of the context window
+in characters, which on a 1M model is ~10k tokens; most user skills are
+already truncated to their names. `skillOverrides` per skill takes on,
+name-only, user-invocable-only, off.
+
+Replay: `skill_listing` attachments (623, p50 1.8k tokens) cost 2.3% of
+the bill as residency. In 14 days the model invoked 9 skills on its own;
+the user typed /loop 50 times. Hiding a skill is a judgement call, so this
+ships as doctor advice, not a default: when the listing is over 1.5% of the
+bill, doctor names the skills Claude actually invoked and the
+`skillOverrides` setting. Upper bound on the saving: 2.3%.
+
 ## Queue (expected % of bill x confidence / cost to test)
 
 Remaining budget before the $40 pause: ~$10 after the regression run.

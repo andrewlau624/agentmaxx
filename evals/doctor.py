@@ -152,6 +152,15 @@ def main() -> int:
         advice += 1
         print(f"  {advice}. Bash output is {tool_tokens['Bash'] / sum(tool_tokens.values()):.0%} of tool-result tokens. "
               "Install the agentmaxx squeeze hook (make install).")
+    listing = sum(tok * (1.8 + 0.1 * max(0, len(s["usage"]) - at)) for s in sessions
+                  for kind, at, *rest in s["events"] if kind == "skills" for tok in rest[:1])
+    if listing / total > 0.015:
+        used = {rest[0] for s in sessions for kind, _, *rest in s["events"] if kind == "invoked" and rest}
+        advice += 1
+        print(f"  {advice}. The skill listing rides in every request: {listing / total:.1%} of your bill. In {args.days}d Claude\n"
+              f"     invoked {len(used)} skills on its own: {', '.join(sorted(used))}.\n"
+              '     Hide the ones you only run by hand with settings.json\n'
+              '     "skillOverrides": {"<name>": "user-invocable-only"} (they stay available as /name).')
     if not advice:
         print("  nothing major; run `make telemetry` for per-session detail")
     return 0
