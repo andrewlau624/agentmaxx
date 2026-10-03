@@ -88,8 +88,7 @@ lines, plus sentence-length variation for prose. Tests in
 `evals/test_tells.py`.
 
 Human baseline, pre-2022 text from requests, flask, httpx, fastapi (blobless
-clones in `~/.cache/agentmaxx-bench/human`, script kept in the ledger's
-scratch, rerunnable):
+clones; `python3 evals/tells_baseline.py`):
 
 | Medium | Sample | Result |
 |---|---|---|
