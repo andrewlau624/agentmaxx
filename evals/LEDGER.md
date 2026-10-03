@@ -261,6 +261,23 @@ ships as doctor advice, not a default: when the listing is over 1.5% of the
 bill, doctor names the skills Claude actually invoked and the
 `skillOverrides` setting. Upper bound on the saving: 2.3%.
 
+## Iteration 6 (regression check, $3.60)
+
+`make test`: evals 32 OK, hooks 15 OK; tools has the 4 known `rg`-binary
+errors. Original fixture bench, Sonnet, base vs v2, 3 reps: v2 -16% (90% CI
+-41% to -11%), 19/19 pass. Was -18%. Within the 3-point rule.
+
+## Iteration 9: does compaction mid-task hurt quality?
+
+The window has a floor of 100k (`m6e=1e5` in 2.1.288), so Sonnet's real-task
+runs (peak ~23k) can't be forced to compact. `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`
+(a test override, parsed as a percent) with a 100k window compacts at ~40k.
+Probe: one Haiku run compacted twice, peak 32k, passed, $0.23.
+
+Hypothesis: forced compaction mid-task drops Haiku's pass rate on the real
+tasks by >=15 points. Arm v2_c40, 10 tasks x 2 reps vs the 20 Haiku v2
+calibration runs. Estimate ~$5.50; cumulative ~$37.50.
+
 ## Queue (expected % of bill x confidence / cost to test)
 
 Remaining budget before the $40 pause: ~$10 after the regression run.

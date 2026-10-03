@@ -95,5 +95,16 @@
    "arms/v2_settings.json": ".claude/settings.json"
   },
   "skills": true
+ },
+ "v2_c40": {
+  "env": {
+   "ENABLE_TOOL_SEARCH": "true",
+   "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "100000",
+   "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "40"
+  },
+  "files": {
+   "{AMX}/templates/CLAUDE.md": "CLAUDE.md",
+   "arms/v2_settings.json": ".claude/settings.json"
+  }
  }
 }
