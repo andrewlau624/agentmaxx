@@ -133,7 +133,7 @@ def one(arm, task, rep, model):
     setup(arm, d)
     env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_BASE_URL",)}
     env.update(a.get("env", {})); env["AGENTMAXX_HOME"] = tempfile.mkdtemp(prefix="amx-home-")
-    cmd = ["claude", "-p", TASKS[task]["prompt"], "--model", model, "--output-format", "json",
+    cmd = ["claude", "-p", a.get("prefix", "") + TASKS[task]["prompt"], "--model", model, "--output-format", "json",
            "--setting-sources", "project,local", "--permission-mode", "bypassPermissions"] + (["--mcp-config", f"{d}/.mcp-arm.json"] if a.get("mcp") else [])
     t0 = time.time()
     p = subprocess.run(cmd, cwd=d, env=env, capture_output=True, text=True, timeout=1500, stdin=subprocess.DEVNULL)
@@ -149,7 +149,7 @@ def one(arm, task, rep, model):
     ok = grade(task, d, j.get("result", ""))
     tells = tells_of(task, d) if "gen" in TASKS[task] else None
     rec = dict(arm=arm, task=task, rep=rep, model=model, ok=ok, cost=j.get("total_cost_usd", 0), turns=j.get("num_turns"),
-               secs=round(dt), tool_bytes=tb, peak_ctx=peak, tools=tools, err=j.get("is_error"), **tot,
+               secs=round(dt), by_model={m: round(u.get("costUSD", 0), 4) for m, u in mu.items()}, tool_bytes=tb, peak_ctx=peak, tools=tools, err=j.get("is_error"), **tot,
                wcost=tot["in"] + 1.25 * tot["cw"] + 0.1 * tot["cr"] + 5 * tot["out"], dir=d,
                **({"tells": tells["count"], "tells_density": tells["density"], "tells_hits": tells["hits"]} if tells else {}))
     with open(f"{B}/results.jsonl", "a") as fh: fh.write(json.dumps(rec) + "\n")

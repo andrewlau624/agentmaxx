@@ -6,7 +6,7 @@ last. Every number has the command that produced it.
 Cost is the weighted index: input 1, cache write 1.25 (5m) or 2 (1h), cache
 read 0.1, output 5.
 
-Bench spend so far: $39.7 (cap $40 reached: paused for a go-ahead) (estimates are logged before each batch; actuals after).
+Bench spend so far: $40.1 (cap raised to $80 by the user on 2026-10-03 for items 5-7) (estimates are logged before each batch; actuals after).
 
 ## Iteration 1 (2026-10-03): price what sits in context
 
@@ -313,6 +313,24 @@ Anthropic's second-order cream/terracotta default. Gate counts only strong
 rules: 22% of model docs, 1% of human docs.
 
 Still not done: the LLM-judge pass (needs bench budget).
+
+## Iteration 11: install, and a cheaper subagent model
+
+Installed on the author's machine at their request (full `make install`;
+settings backed up first). graymatter 0.20.0 refuses to update any existing
+file on macOS (`unsupported_metadata`), so `external/install.py` now retries
+its init without the Codex and instructions steps.
+
+Subagents are 13.5% of the bill, 84% of it on Opus. In 2.1.288 the built-in
+Explore and general-purpose agents use `model:"inherit"`;
+`CLAUDE_CODE_SUBAGENT_MODEL` sets the default for subagents and
+`CLAUDE_CODE_SUBAGENT_MODEL_FORCE` overrides per-call models.
+
+Hypothesis: with an Opus parent, routing subagents to Sonnet (or Haiku) cuts
+subagent cost by >=40% at equal pass rate. Arms v2_deleg (prompt asks for a
+subagent before editing), v2_deleg_sonnet, v2_deleg_haiku; Opus parent; 5
+real tasks x 2 reps. Probe: one Opus run delegated once, passed, $0.37.
+Estimate 30 runs x $0.37 = ~$11; cumulative ~$51.
 
 ## Queue (expected % of bill x confidence / cost to test)
 
