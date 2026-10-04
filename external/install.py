@@ -47,7 +47,9 @@ def install_entry(entry: dict) -> bool:
 
     for cmd in entry.get("wire", []):
         if shutil.which(cmd[0]) and not run(cmd):
-            return False
+            # e.g. graymatter 0.20 on macOS refuses to update any existing file (unsupported_metadata)
+            if not entry.get("wire_fallback") or not all(run(c) for c in entry["wire_fallback"]):
+                return False
 
     return True
 
