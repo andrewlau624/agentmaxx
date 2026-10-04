@@ -169,6 +169,14 @@ def main() -> int:
               f"     invoked {len(used)} skills on its own: {', '.join(sorted(used))}.\n"
               '     Hide the ones you only run by hand with settings.json\n'
               '     "skillOverrides": {"<name>": "user-invocable-only"} (they stay available as /name).')
+    opus_sub = sum(residency.request_cost(u) for s in sessions if s["subagent"] for u in s["usage"]
+                   if (u.get("model") or "").startswith("claude-opus"))
+    if opus_sub / total > 0.05 and "CLAUDE_CODE_SUBAGENT_MODEL" not in env:
+        advice += 1
+        print(f"  {advice}. Opus subagents are {opus_sub / total:.0%} of your bill. On the real-repo bench, Sonnet 5.5 subagents\n"
+              "     under an Opus parent passed 8/10 vs 7/10 at -22% per task (Haiku saved nothing). Set env\n"
+              "     CLAUDE_CODE_SUBAGENT_MODEL=claude-sonnet-5-5 and CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1 (without FORCE,\n"
+              "     Explore keeps the parent's model; with it, models named in your own agents are overridden too).")
     if not advice:
         print("  nothing major; run `make telemetry` for per-session detail")
     return 0

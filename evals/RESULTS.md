@@ -208,6 +208,21 @@ P >= 0.5, so it can't serve as a gate. It invented 13 of 267 quotes, which
 the script drops. An unmatched first pass (model docs about the bench
 fixture) gave AUC 1.00 from topic alone and is not reported.
 
+## Subagent model (bench)
+
+Opus 5.5 parent, prompt asks for a subagent before editing, 5 real tasks x
+2 reps. `CLAUDE_CODE_SUBAGENT_MODEL` alone does nothing for Explore (it
+inherits the parent's model); it needs `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1`.
+
+| Subagents | Pass | Cost per task |
+|---|---|---|
+| Opus (inherit) | 7/10 | $0.384 |
+| Sonnet 5.5 + FORCE | 8/10 | −22% (90% CI −37% to −6%) |
+| Haiku 4.5 + FORCE | 8/11 | +6% (CI −15% to +30%) |
+
+Subagents are 12.5% of this machine's spend, so Sonnet subagents are worth
+roughly 3% of the bill. FORCE also overrides models set in custom agents.
+
 ## Effort level (bench, negative)
 
 Sonnet 5.5, `v2` arm, 10 real-repo tasks x 3 reps per arm.

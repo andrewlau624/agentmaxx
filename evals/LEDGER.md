@@ -6,7 +6,7 @@ last. Every number has the command that produced it.
 Cost is the weighted index: input 1, cache write 1.25 (5m) or 2 (1h), cache
 read 0.1, output 5.
 
-Bench spend so far: ~$56 (subagent batch still running) (cap raised to $80 by the user on 2026-10-03 for items 5-7) (estimates are logged before each batch; actuals after).
+Bench spend so far: ~$64 of $80 (cap raised to $80 by the user on 2026-10-03 for items 5-7) (estimates are logged before each batch; actuals after).
 
 ## Iteration 1 (2026-10-03): price what sits in context
 
@@ -331,6 +331,23 @@ subagent cost by >=40% at equal pass rate. Arms v2_deleg (prompt asks for a
 subagent before editing), v2_deleg_sonnet, v2_deleg_haiku; Opus parent; 5
 real tasks x 2 reps. Probe: one Opus run delegated once, passed, $0.37.
 Estimate 30 runs x $0.37 = ~$11; cumulative ~$51.
+
+Result ($11.15, then $7.47). The first batch measured nothing: every
+subagent ran on Opus. The built-in Explore agent says `model:"inherit"`,
+which wins over `CLAUDE_CODE_SUBAGENT_MODEL`; `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1`
+is also needed (probe: $0.24 of a $0.40 run on Haiku). Rerun with FORCE,
+same 5 tasks x 2 reps, against the 10 Opus-subagent runs:
+
+| Subagents | Pass | Cost per task vs Opus subagents |
+|---|---|---|
+| Opus (inherit) | 7/10 | $0.384 |
+| Sonnet 5.5 + FORCE | 8/10 | -22% (90% CI -37% to -6%) |
+| Haiku 4.5 + FORCE | 8/11 | +6% (CI -15% to +30%) |
+
+Haiku explores longer and spends $0.20 a run itself. Sonnet holds the pass
+rate and cuts cost. Caveat: FORCE also overrides models named in custom
+agent and workflow definitions, so this is the user's call, not an
+installer default. Shipped as doctor advice.
 
 ## Iteration 12: blind judge for tells ($4.06)
 
