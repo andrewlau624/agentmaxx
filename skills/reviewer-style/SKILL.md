@@ -33,6 +33,8 @@ Turn a reviewer's past comments into the style file `code-review` enforces. One 
 
    Scope to feature PRs (`select(.pull_request)`); release/CI/version PRs carry noise, not style.
 
+   Pair each comment with what the author did about it: the next commit on the PR that touched the same file and lines (`gh api repos/OWNER/REPO/pulls/<n>/commits`, then `git show <sha> -- <path>`). Google trained its review-comment model on exactly this, "the reviewer comments, and the edits the author performed to address those comments". A comment the author fixed is a rule the reviewer enforces. One that was argued down or ignored is weaker.
+
 2. **Cluster** the comments by the concern they name. Read the full set, then group recurring themes:
 
    - `no silent fallbacks` → a must-fix rule
@@ -43,6 +45,8 @@ Turn a reviewer's past comments into the style file `code-review` enforces. One 
    - `should have a protocol` → nit (shared abstraction)
 
    A comment that names a *different* rule than the thread it's on is a real concern, not a mis-click. A comment that is only a question ("is this correct?") with no stated preference is not a rule; skip it.
+
+   Keep a rule only if it shows up in at least two separate PRs, or once with a fix the author made. Precision beats recall here: Google calibrated its model to 50% precision because "incorrect suggested edits take the developers time". A wrong rule in the style file costs every future review.
 
 3. **Write** the distilled standard to `~/.config/agentmaxx/review-style.md` (create if missing), in the format `code-review` reads:
 

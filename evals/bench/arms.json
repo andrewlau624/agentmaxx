@@ -162,5 +162,16 @@
    "arms/v2_settings.json": ".claude/settings.json"
   },
   "prefix": "Use the Agent tool (Explore or general-purpose subagent) to locate the relevant code and explain the failure before you edit anything. "
+ },
+ "v2_vpr": {
+  "env": {
+   "ENABLE_TOOL_SEARCH": "true"
+  },
+  "files": {
+   "{AMX}/templates/CLAUDE.md": "CLAUDE.md",
+   "arms/v2_settings.json": ".claude/settings.json"
+  },
+  "skills": true,
+  "prefix": "Before you finish, follow the verify-pr skill (.claude/skills/verify-pr/SKILL.md) for this change. "
  }
 }

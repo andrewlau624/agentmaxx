@@ -22,9 +22,20 @@ Both are optional; missing ones get created on first save.
 
    For PRs substitute the appropriate base ref. If the patch exceeds ~600 lines, truncate; `--stat` carries the shape.
 
-2. **Review the diff only.** Pull minimal surrounding context with `better-cat` ranges when a change is ambiguous; never read whole files. Stored style rules apply silently; they surface only when violated.
+2. **Check, in this order.** Design first, because a well-styled change that shouldn't exist is the expensive miss (Google's review guide: "The most important thing to cover in a review is the overall design of the CL"):
 
-3. **Report**, ordered `must-fix` → `nit` → `praise`:
+   - Does it do what the user needs, and is it one self-contained change? Unrelated edits are a finding.
+   - Is it more complex than the problem needs? Speculative options, layers, and abstractions for one caller are findings.
+   - Failure paths: bad input, missing config, a dependency down. Agent-written tests skip these most of the time (try/catch lines went untested 81-86% of the time in arXiv 2607.18057), so a new error path with no test is a must-fix.
+   - Could the tests fail? Tests that mock the thing under test, or assert the implementation instead of the outcome, prove nothing.
+   - Production differences: new env vars without defaults or deploy config, files missing from the build, schema changes without a migration.
+   - Then the stored style rules, then naming and readability.
+
+   The bar is Google's: approve once the change "definitely improves the overall code health of the system", even if it isn't perfect. Don't block on taste. When reviewing your own work, run the review in a subagent with only the diff and the style files, so the reviewer didn't write the code.
+
+3. **Review the diff only.** Pull minimal surrounding context with `better-cat` ranges when a change is ambiguous; never read whole files. Stored style rules apply silently; they surface only when violated.
+
+4. **Report**, ordered `must-fix` → `nit` → `praise`:
 
    ```
    must-fix  src/api.ts:42: unhandled fetch: no try/catch, no res.ok check → wrap and guard
@@ -33,7 +44,7 @@ Both are optional; missing ones get created on first save.
 
    One line each: `file:line: problem → fix`. No restating code, no summarizing what the diff does, no praise padding. Empty categories are skipped, not announced.
 
-4. **Persist learnings; this is the point of the skill.** When the user corrects a finding ("that pattern is fine", "we always do X") or states a rule ("no default exports", "early return always"):
+5. **Persist learnings; this is the point of the skill.** When the user corrects a finding ("that pattern is fine", "we always do X") or states a rule ("no default exports", "early return always"):
    - Write the *rule*, never the incident: "prefer early returns", not "in api.ts don't nest else". One generalized principle replaces five logged cases.
    - New entries go under `## Probation` with today's date. They promote to their permanent section only after firing in a later review (you enforced them again). Probation entries older than 30 days that never fired are deleted on next save; a rule nobody trips over isn't a rule.
    - Check for a near-duplicate before writing; refine the existing entry instead of appending a second.
