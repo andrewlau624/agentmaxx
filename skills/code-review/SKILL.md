@@ -5,22 +5,23 @@ description: Structured diff review with persistent reviewer preferences. Use wh
 
 # Code review with memory
 
-Reviews enforce your accumulated standards, not generic taste. Standards live in two markdown files:
+Reviews enforce your accumulated standards, not generic taste. Standards live in markdown files, all optional:
 
 - `~/.config/agentmaxx/review-style.md`: personal, applies in every repo
 - `.review-style.md` in the repo root: repo-specific conventions (committable for teams)
-
-Both are optional; missing ones get created on first save.
+- `~/.config/agentmaxx/reviewers/<user>.md` or `.reviewers/<user>.md`: one real reviewer's rules with examples, written by `reviewer-style`. Load one when asked to review like that person; load all of `.reviewers/` when the repo has it.
 
 ## Workflow
 
-1. **Gather**: a single bash call:
+1. **Gather** the whole change, not just uncommitted edits. `git diff HEAD` alone shows nothing once the work is committed, so diff from where the branch left the base:
 
    ```sh
-   git diff HEAD && cat ~/.config/agentmaxx/review-style.md .review-style.md 2>/dev/null
+   base=$(git merge-base HEAD "$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null || echo main)")
+   git diff --stat "$base"; git diff "$base"; git log --oneline "$base"..HEAD
+   cat ~/.config/agentmaxx/review-style.md .review-style.md 2>/dev/null
    ```
 
-   For PRs substitute the appropriate base ref. If the patch exceeds ~600 lines, truncate; `--stat` carries the shape.
+   For a GitHub PR use `gh pr diff <n>` and `gh pr view <n>` (the description says what it's meant to do). Review the whole diff; for one over ~1,500 lines, review it file by file rather than truncating. Say which files you skipped, if any.
 
 2. **Check, in this order.** Design first, because a well-styled change that shouldn't exist is the expensive miss (Google's review guide: "The most important thing to cover in a review is the overall design of the CL"):
 
@@ -33,7 +34,7 @@ Both are optional; missing ones get created on first save.
 
    The bar is Google's: approve once the change "definitely improves the overall code health of the system", even if it isn't perfect. Don't block on taste. When reviewing your own work, run the review in a subagent with only the diff and the style files, so the reviewer didn't write the code.
 
-3. **Review the diff only.** Pull minimal surrounding context with `better-cat` ranges when a change is ambiguous; never read whole files. Stored style rules apply silently; they surface only when violated.
+3. **Read what the diff touches.** A diff hides the bugs that live in its callers. For each changed function, signature, or schema, look up its callers and the code it calls (`rg -n "name\("`, or `better-related`), and read the ranges you need. Stored style rules and reviewer rules apply silently; they surface only when violated. When reviewing like a specific reviewer, phrase findings the way their file says they write.
 
 4. **Report**, ordered `must-fix` → `nit` → `praise`:
 

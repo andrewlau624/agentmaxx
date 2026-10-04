@@ -1,80 +1,67 @@
 ---
 name: reviewer-style
-description: Scrape a GitHub reviewer's historical review comments and distill their recurring conventions into the review-style standard. Use when asked to learn a reviewer's style, audit against a specific reviewer (e.g. "Jonathan's concerns"), or bootstrap the code-review memory for a new reviewer.
+description: Learns how a specific GitHub reviewer reviews, from everything they've written on a repo's PRs (inline comments with the code they point at, review summaries, conversation), and saves their rules with real examples so code-review can review like them. Use when asked to learn a reviewer's style, review "like <person>", audit against someone's concerns (e.g. "Jonathan's concerns"), or set up review rules for a new reviewer.
+argument-hint: "OWNER/REPO USER"
 ---
 
-# Reviewer style scraping
+# Learn a reviewer's style
 
-Turn a reviewer's past comments into the style file `code-review` enforces. One scrape, one distilled standard; the reviewer's opinions become `must-fix`/`nit`/`never-flag` rules instead of a pile of one-off threads.
+The goal is a file that lets `code-review` say what this reviewer would say, on code they haven't seen. That takes their recurring concerns, how strongly they hold each one, and real examples of the code that set them off. A list of their opinions isn't enough. Google's review-comment model learned from "the reviewer comments, and the edits the author performed to address those comments" (Google Research blog, "Resolving code review comments with ML"), so the comments the author acted on count most.
 
-## Workflow
+## 1. Scrape
 
-1. **Scrape** the reviewer's inline review comments on merged PRs, newest first:
+Run the bundled script (needs an authenticated `gh`; if `gh auth status` fails, stop and give the user that command):
 
-   ```sh
-   gh api "search/issues?q=repo:OWNER/REPO+commenter:USER+type:pr&per_page=100" \
-     --jq '.items[].number' | sort -n > /tmp/rev-prs.txt
-   while read n; do
-     gh api "repos/OWNER/REPO/pulls/$n/comments" \
-       --jq '.[] | select(.user.login=="USER") | "[\(.path):\(.line // .original_line // "?")] \(.body)"'
-   done < /tmp/rev-prs.txt > /tmp/rev-comments.txt
-   ```
+```sh
+python3 ~/.claude/skills/reviewer-style/scrape.py OWNER/REPO USER --prs 150 --out /tmp/reviews-USER.jsonl
+```
 
-   Also pull issue-level comments if the reviewer reviews at that level:
+It finds PRs the user reviewed or commented on and collects, with pagination, three kinds of text: inline comments with the diff hunk they point at, review summaries (approve or request-changes text), and PR conversation. It marks an inline comment `addressed` when the code under it changed afterwards. On astral-sh/ruff it pulled 413 comments from 100 PRs, where the old inline commands got 283 with no code and no review summaries.
 
-   ```sh
-   gh api "search/issues?q=repo:OWNER/REPO+commenter:USER" \
-     --jq '.items[] | select(.pull_request) | .number' | sort -u \
-     | head -50 | while read n; do
-       gh api "repos/OWNER/REPO/issues/$n/comments" \
-         --jq '.[] | select(.user.login=="USER") | .body'
-     done >> /tmp/rev-comments.txt
-   ```
+If it finds fewer than about 40 comments, raise `--prs`, or add a second repo the reviewer works on, before drawing conclusions. Tell the user how much you got.
 
-   Scope to feature PRs (`select(.pull_request)`); release/CI/version PRs carry noise, not style.
+## 2. Read all of it
 
-   Pair each comment with what the author did about it: the next commit on the PR that touched the same file and lines (`gh api repos/OWNER/REPO/pulls/<n>/commits`, then `git show <sha> -- <path>`). Google trained its review-comment model on exactly this, "the reviewer comments, and the edits the author performed to address those comments". A comment the author fixed is a rule the reviewer enforces. One that was argued down or ignored is weaker.
+Read the JSONL in chunks of about 100 lines. If it runs past about 400 comments, hand chunks to subagents that each return themes with counts and example ids. Skip bot-like text (CI links, "LGTM", "thanks!", merge notices) and pure questions with no stated preference.
 
-2. **Cluster** the comments by the concern they name. Read the full set, then group recurring themes:
+For each comment, ask what it's really objecting to. Say it in general terms that would apply to code the reviewer hasn't seen ("errors from the parser must carry the source span"), not as the incident ("line 40 should pass span"). Then group comments by concern.
 
-   - `no silent fallbacks` → a must-fix rule
-   - `use base settings for config` → a nit or must-fix
-   - `paths in constants` / `enums not strings` / `stronger types` → nits
-   - `uuid not string ids` → must-fix
-   - `how does this scale` / `cache this` → must-fix when the answer is "it doesn't"
-   - `should have a protocol` → nit (shared abstraction)
+## 3. Keep what holds up
 
-   A comment that names a *different* rule than the thread it's on is a real concern, not a mis-click. A comment that is only a question ("is this correct?") with no stated preference is not a rule; skip it.
+For each concern, count the distinct PRs it appears on, and how many of those comments were `addressed`. Keep a rule when it appears on 2 or more PRs, or on one PR with the author changing the code in response. Drop the rest. Google calibrated its model to 50% precision because "incorrect suggested edits take the developers time". A rule the reviewer doesn't really hold makes every future review worse.
 
-   Keep a rule only if it shows up in at least two separate PRs, or once with a fix the author made. Precision beats recall here: Google calibrated its model to 50% precision because "incorrect suggested edits take the developers time". A wrong rule in the style file costs every future review.
+Rank severity by what the reviewer did, not by your own taste. Request-changes reviews and comments that were addressed point to must-fix. Comments phrased as "nit:", "optional", or "consider" are nits. Things the reviewer explicitly let go ("fine here", "not blocking") go under "Never flag".
 
-3. **Write** the distilled standard to `~/.config/agentmaxx/review-style.md` (create if missing), in the format `code-review` reads:
+## 4. Write the reviewer file
 
-   ```markdown
-   ## Must-fix (treat as bugs)
-   - no silent fallbacks; every except logs and re-raises or returns a logged fallback
-   - ids are UUID, never strings, across the Temporal wire too
+Write `~/.config/agentmaxx/reviewers/USER.md`, or `.reviewers/USER.md` in the repo if the user wants it shared with the team:
 
-   ## Style nits
-   - tunables live in BaseSettings, not module constants
-   - URL paths and header names live in the module config, not inlined at call sites
-   - enums over strings for categorical fields
-   - prefer shared protocols for cross-connector behavior
+```markdown
+# USER on OWNER/REPO (scraped YYYY-MM-DD: 413 comments, 100 PRs)
 
-   ## Never flag
-   - raw SQL in Alembic revisions
+## Must-fix
+- Errors from the parser carry the source span. (7 PRs, 6 addressed)
+  e.g. crates/parser/src/lexer.rs: "This loses the range. Can we return a `ParseError` with the token's span so the diagnostic points somewhere useful?"
 
-   ## Probation (entered YYYY-MM-DD)
-   - one generalized rule per recurring comment theme
-   ```
+## Nits
+- Prefer `&str` over `String` for read-only parameters. (4 PRs, 3 addressed)
+  e.g. ...
 
-   Rules go under `## Probation` first, same as `code-review`'s own growth brake; they promote only after firing again. Keep it under 40 lines; merge duplicates.
+## Never flag
+- Long match arms in generated code. (said "fine, it's generated" twice)
 
-4. **Confirm** with one line: `scraped <n> comments from <user> → saved <k> rules to review-style.md`.
+## How they write comments
+- Short, ends in a question, offers the fix ("Can we ...?"). Explains the why when blocking.
+```
+
+Give each rule one real example: a short quote plus the path. Keep it to the top 25 rules or so. These rules are backed by evidence, so they don't go through `code-review`'s probation step.
+
+## 5. Confirm
+
+One line: `USER: 413 comments from 100 PRs, 18 rules (7 must-fix, 9 nits, 2 never-flag) -> ~/.config/agentmaxx/reviewers/USER.md`. Then name the 3 strongest rules so the user can sanity-check them.
 
 ## Notes
 
-- The target file is the same one `code-review` reads, so after this skill runs, every review enforces the scraped style automatically; no second hop.
-- Prefer the reviewer's *stated rule* over the incident. "we should have a protocol for crawl as well?" becomes "prefer shared protocols for cross-connector behavior", not "Jonathan wanted a crawl protocol in 5437".
-- If the reviewer's threads already have "Fixed in …" replies, the fix is the rule, not the complaint; the concern that *needed* fixing is the one to record.
-- `gh` is the only external dependency; if it is not authenticated, fail explicitly with the command to run, never fabricate a style.
+- `code-review` reads reviewer files when asked to review like that person, or when the repo has `.reviewers/`.
+- When the user corrects a rule ("he doesn't care about that anymore"), edit the reviewer file directly.
+- Never fill gaps with generic best practice. If the scrape is thin, the file is short and says so.
