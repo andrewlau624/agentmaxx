@@ -17,6 +17,7 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import corrections  # noqa: E402
 import residency  # noqa: E402
 
 PROJECTS = Path.home() / ".claude" / "projects"
@@ -120,6 +121,9 @@ def main() -> int:
     print(f"Fixed prefix at session start: p50 {pct(prefixes, .5):,} tokens")
     print("Largest tool-result sources (tokens added):", ", ".join(
         f"{n} {t / 1e6:.1f}M" for n, t in tool_tokens.most_common(4)))
+
+    print("\nCorrections (the closest free proxy for agent quality)")
+    print("\n".join(corrections.report(corrections.scan(args.days))))
 
     print("\nRecommendations")
     advice = 0
