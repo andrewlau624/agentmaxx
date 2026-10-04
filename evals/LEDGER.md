@@ -6,7 +6,7 @@ last. Every number has the command that produced it.
 Cost is the weighted index: input 1, cache write 1.25 (5m) or 2 (1h), cache
 read 0.1, output 5.
 
-Bench spend so far: ~$64 of $80 (cap raised to $80 by the user on 2026-10-03 for items 5-7) (estimates are logged before each batch; actuals after).
+Bench spend so far: ~$70 of $80 (cap raised to $80 by the user on 2026-10-03 for items 5-7) (estimates are logged before each batch; actuals after).
 
 ## Iteration 1 (2026-10-03): price what sits in context
 
@@ -381,6 +381,25 @@ Unit 42 quotes, all matched). Shipped two hooks:
 
 Pricing correction found on the way: Opus 5.5 cache hits are 0.05x input
 (pricing page), not 0.1x. The weighted index overstates reads for Opus.
+
+## Iteration 14: new skills, and two that pulled too little
+
+User asked for QA, teaching, safe-change and review skills, removal of
+antigravity and ultimate-protocol, and no compact window (prefers 1M).
+Sources in `evals/skills-sources.md` (45, 3 quotes re-fetched).
+
+verify-pr bench, Sonnet, 10 real tasks x 3 ($4.17): 27/30 vs 26/30
+without it, +42% cost per task ($0.139 vs $0.098). Hardest task 1/3 vs 0/3.
+Not significant; these tasks have none of the prod-only failures the skill
+targets (config, build, migrations), so they can't show its main effect.
+
+reviewer-style pulled little: one search page, 30 comments per PR, no
+review summaries, no code. New `scrape.py` paginates and keeps diff hunks
+and an `addressed` flag. MichaReiser on astral-sh/ruff, 100 PRs: 413
+comments vs 283. End to end via `claude -p` on Sonnet ($1.09): 742
+comments from 150 PRs, 84-line reviewer file with counts and real quotes.
+code-review gathered `git diff HEAD`, empty once work is committed; it now
+diffs from the merge base and reads callers of what changed.
 
 ## Queue (expected % of bill x confidence / cost to test)
 
