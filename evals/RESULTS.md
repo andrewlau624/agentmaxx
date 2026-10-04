@@ -292,6 +292,7 @@ correction nudge, as one imperative line.
   double-counting telemetry; disregard them.
 - Terse-output contracts: external A/B (JetBrains, 86 tasks) found −8.5%;
   RTK-style command rewriting found +7.6% cost. Not re-tested here.
-- Haiku subagents: plausible, not benchmarked.
+- Test-cheating gate: 0 of 24 tempted runs cheated, so the bench can't
+  show it helps (see LEDGER iteration 15).
 - n=3 per cell. Differences under ~10% on a single task are noise; the
   across-task averages above are the claim.

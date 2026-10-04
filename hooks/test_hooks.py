@@ -1,7 +1,9 @@
 import importlib.util
 import json
 import pathlib
+import os
 import unittest
+import unittest.mock
 
 HERE = pathlib.Path(__file__).parent
 
@@ -116,7 +118,99 @@ class TestVerify(unittest.TestCase):
         os.makedirs(os.path.join(d, "tests"))
         open(os.path.join(d, "tests", "test_a.py"), "w").close()
         self.assertIn("unittest", verify.detect(d))
+        self.assertNotIn("-t .", verify.detect(d))
+        open(os.path.join(d, "tests", "__init__.py"), "w").close()
+        self.assertIn("-t .", verify.detect(d))
 
+    def test_detect_pytest_conftest_in_tests_dir(self):
+        import tempfile, os
+        d = tempfile.mkdtemp()
+        os.makedirs(os.path.join(d, "tests"))
+        open(os.path.join(d, "tests", "conftest.py"), "w").close()
+        open(os.path.join(d, "tests", "test_a.py"), "w").close()
+        self.assertIn("pytest", verify.detect(d))
+
+    def test_fingerprint_survives_non_utf8(self):
+        import tempfile, subprocess
+        d = tempfile.mkdtemp()
+        open(f"{d}/cp1252.txt", "w").write("plain")
+        subprocess.run("git init -q && git add . && git -c user.name=t -c user.email=t@t commit -q -m x", shell=True, cwd=d, check=True)
+        open(f"{d}/cp1252.txt", "wb").write(b"\x93quoted\x94")
+        self.assertIsNotNone(verify.tree_fingerprint(d))
+
+
+class TestRatchet(unittest.TestCase):
+    def repo(self, files):
+        import tempfile, subprocess
+        d = tempfile.mkdtemp()
+        for rel, body in files.items():
+            os.makedirs(os.path.dirname(os.path.join(d, rel)) or d, exist_ok=True)
+            open(os.path.join(d, rel), "w").write(body)
+        subprocess.run("git init -q && git add . && git -c user.name=t -c user.email=t@t commit -q -m x",
+                       shell=True, cwd=d, check=True)
+        return d
+
+    def write(self, d, rel, body):
+        open(os.path.join(d, rel), "w").write(body)
+
+    def test_flags_only_added_lines(self):
+        d = self.repo({"lib.py": "x = 1  # noqa\n", "tests/test_a.py": "def test_a():\n    assert f() == 2\n"})
+        self.assertEqual(verify.cheat_findings(d), [])  # legacy noqa never counts
+        self.write(d, "lib.py", "x = 1  # noqa\ny = 2  # type: ignore\n")
+        self.write(d, "tests/test_a.py", "import pytest\n@pytest.mark.skip\ndef test_a():\n    pass\n")
+        found = "\n".join(verify.cheat_findings(d))
+        self.assertIn("lib.py:2 blanket suppression", found)
+        self.assertIn("skip without a ticket", found)
+        self.assertIn("tests/test_a.py: removed 1 assertion(s)", found)
+        self.assertNotIn("lib.py:1", found)
+        self.write(d, "lib.py", "x = 1  # noqa\nimport os  # noqa: E402\ny = f()  # type: ignore[arg-type]\n")
+        self.write(d, "notes.md", "bare `except: pass` is bad  # noqa\n")
+        self.write(d, "io.py", "try:\n    open('x')\nexcept FileNotFoundError:\n    pass\n")
+        found = "\n".join(verify.cheat_findings(d))
+        self.assertNotIn("lib.py", found)
+        self.assertNotIn("notes.md", found)
+        self.assertNotIn("io.py", found)
+
+    def test_ticket_allows_skip_and_baseline_excludes(self):
+        d = self.repo({"tests/test_a.py": "def test_a():\n    assert 1\n"})
+        self.write(d, "tests/test_a.py", "import pytest\n@pytest.mark.skip(reason='flaky, PROJ-42')\ndef test_a():\n    assert 1\n")
+        self.assertEqual(verify.cheat_findings(d), [])
+        self.write(d, "new.py", "try:\n    go()\nexcept Exception:\n    pass\n")
+        found = verify.cheat_findings(d)
+        self.assertTrue(any("swallowed exception" in f for f in found), found)
+        self.assertEqual(verify.cheat_findings(d, set(verify.cheat_keys(found))), [])
+
+    def test_patterns_inside_strings_ignored(self):
+        d = self.repo({"lib.py": "x = 1\n"})
+        self.write(d, "lib.py", 'x = 1\nPAT = r"pytest\\.mark\\.skip|# noqa"\nfix = "y = 2  # type: ignore"\nz = 3  # noqa\n')
+        self.assertEqual([f.split(" ", 1)[0] for f in verify.cheat_findings(d)], ["lib.py:4"])
+
+    def test_deleted_test_file_counts(self):
+        d = self.repo({"tests/test_a.py": "def test_a():\n    assert 1\n"})
+        os.remove(os.path.join(d, "tests/test_a.py"))
+        self.assertEqual(verify.cheat_findings(d), ["tests/test_a.py: removed 1 assertion(s)"])
+
+    def test_stop_blocks_on_cheat_and_notes_unverified(self):
+        import io, contextlib, tempfile
+        d = self.repo({"lib.py": "x = 1\n"})
+        self.write(d, "lib.py", "x = 1  # noqa\n")
+        transcript = os.path.join(tempfile.mkdtemp(), "t.jsonl")
+        open(transcript, "w").write(json.dumps({"message": {"content": [{"type": "tool_use", "name": "Edit", "input": {}}]}}) + "\n")
+        old_state, verify.STATE = verify.STATE, tempfile.mkdtemp()
+        os.environ["AGENTMAXX_VERIFY_CMD"] = "sleep 5"
+        old_timeout, verify.TIMEOUT = verify.TIMEOUT, 1
+        event = {"hook_event_name": "Stop", "cwd": d, "session_id": "s1", "transcript_path": transcript}
+        out = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out), unittest.mock.patch("sys.stdin", io.StringIO(json.dumps(event))):
+                verify.main()
+        finally:
+            verify.STATE, verify.TIMEOUT = old_state, old_timeout
+            del os.environ["AGENTMAXX_VERIFY_CMD"]
+        res = json.loads(out.getvalue())
+        self.assertEqual(res["decision"], "block")
+        self.assertIn("lib.py:1 blanket suppression", res["reason"])
+        self.assertIn("timed out", res["systemMessage"])
 
 class TestLessons(unittest.TestCase):
     def test_correction_detection(self):
