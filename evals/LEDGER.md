@@ -6,7 +6,7 @@ last. Every number has the command that produced it.
 Cost is the weighted index: input 1, cache write 1.25 (5m) or 2 (1h), cache
 read 0.1, output 5.
 
-Bench spend so far: $40.1 (cap raised to $80 by the user on 2026-10-03 for items 5-7) (estimates are logged before each batch; actuals after).
+Bench spend so far: ~$56 (subagent batch still running) (cap raised to $80 by the user on 2026-10-03 for items 5-7) (estimates are logged before each batch; actuals after).
 
 ## Iteration 1 (2026-10-03): price what sits in context
 
@@ -331,6 +331,39 @@ subagent cost by >=40% at equal pass rate. Arms v2_deleg (prompt asks for a
 subagent before editing), v2_deleg_sonnet, v2_deleg_haiku; Opus parent; 5
 real tasks x 2 reps. Probe: one Opus run delegated once, passed, $0.37.
 Estimate 30 runs x $0.37 = ~$11; cumulative ~$51.
+
+## Iteration 12: blind judge for tells ($4.06)
+
+Hypothesis: an LLM judge separates model from human docs where the regex
+can't, and the human-voice skill lowers the judge's score. First half holds
+on topic-matched twins (judge AUC 0.84, regex 0.52). Second half is wrong:
+the skill raised it (AUC 0.99, 15 of 19 pairs worse, CI excludes 0). The
+"How people actually write" section asks for fragments, asides and jokes,
+and the judge quoted exactly that. Removed it (AUC 0.91, not significantly
+better than the full skill, still worse than no guide). Decision: ship the
+removal; the skill as a whole is unproven and is not something to load by
+default. Details in RESULTS.md.
+
+## Iteration 13: injection and supply-chain checks (free)
+
+Sources: `evals/security-sources.md` (25 sources, a subagent; I re-fetched
+the permissions trust table, the skills `allowed-tools` passage and three
+Unit 42 quotes, all matched). Shipped two hooks:
+
+- `inject_scan.py`, PostToolUse on WebFetch, WebSearch, mcp__*: adds a note
+  when a result carries a strong marker (instruction override, admin
+  markers, chat-template tokens, `<IMPORTANT>`, Unicode Tag text decoded
+  into the note, bidi controls, exfil-shaped markdown images, destructive
+  payloads). Weak markers only count next to a strong one. 0 of 334 human
+  docs flagged. Replay on real web/MCP results was refused by auto mode
+  (personal data); a counts-only run needs the user's go-ahead.
+- `repo_audit.py`: CLI and SessionStart hook listing project hooks, env
+  credentials redirects, helpers, `.mcp.json` servers, skill `` !`cmd` `` and
+  `allowed-tools`, and outside imports, each tied to a Part B row. Warns once
+  per repo state. 6 of 32 local project dirs have findings.
+
+Pricing correction found on the way: Opus 5.5 cache hits are 0.05x input
+(pricing page), not 0.1x. The weighted index overstates reads for Opus.
 
 ## Queue (expected % of bill x confidence / cost to test)
 

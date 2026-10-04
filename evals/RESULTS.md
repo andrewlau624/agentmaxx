@@ -176,6 +176,30 @@ gate; 13 of 30 generated pages use the cream background near `#F4F1EA`
 that Anthropic's own frontend-design skill lists as a second-order default.
 The old regex list had called those pages clean.
 
+Blind judge, topic-matched (`python3 evals/tells_judge.py --matched --n 20`,
+then `--variant` for the third arm; $4.06). For 20 pre-2021 human docs,
+Opus 5.5 wrote a twin from the same project, title and headings. Sonnet 5.5
+saw each excerpt alone and gave P(machine):
+
+| Arm | Judge AUC vs human | Regex AUC | Mean P(machine) |
+|---|---|---|---|
+| Human | | | 0.07 |
+| Opus, no guide | 0.84 | 0.52 | 0.15 |
+| Opus + human-voice skill | 0.99 | 0.42 | 0.25 |
+| Opus + skill without "How people actually write" | 0.91 | 0.47 | |
+
+The skill made the writing easier to spot, not harder: the judge scored the
+skill twin above the plain twin in 15 of 19 pairs, AUC difference 90% CI
++0.08 to +0.23. The phrases it cited are the register that section asks
+for ("few people remember which number goes with which name, though, and
+you don't need to"). Removing the section helped in 10 of 19 pairs (5
+worse), which isn't significant; it still doesn't beat no guide. The regex
+detector can't separate these docs at all (AUC ~0.5). The judge ranks well
+but is badly calibrated: it called 1 of 58 model docs machine-written at
+P >= 0.5, so it can't serve as a gate. It invented 13 of 267 quotes, which
+the script drops. An unmatched first pass (model docs about the bench
+fixture) gave AUC 1.00 from topic alone and is not reported.
+
 ## Effort level (bench, negative)
 
 Sonnet 5.5, `v2` arm, 10 real-repo tasks x 3 reps per arm.

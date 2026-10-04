@@ -84,10 +84,10 @@ def headings(text: str) -> list[str]:
     return (md or ["# " + h for h in rst])[:8]
 
 
-def twin(doc: dict, model: str, voice: bool) -> dict:
+def twin(doc: dict, model: str, voice: bool, skill: Path = SKILL, arm: str = "") -> dict:
     prompt = GEN % (doc["path"], doc["repo"], "\n".join(doc["heads"]), len(doc["text"].split()))
     if voice:
-        prompt = "Follow this writing guide.\n\n" + SKILL.read_text() + "\n\n" + prompt
+        prompt = "Follow this writing guide.\n\n" + skill.read_text() + "\n\n" + prompt
     with tempfile.TemporaryDirectory() as d:
         p = subprocess.run(["claude", "-p", prompt, "--model", model, "--output-format", "json",
                             "--setting-sources", "project,local", "--tools", ""],
@@ -96,11 +96,11 @@ def twin(doc: dict, model: str, voice: bool) -> dict:
         j = json.loads(p.stdout)
     except json.JSONDecodeError:
         j = {}
-    return {"label": 1, "arm": "voice" if voice else "model", "text": excerpt(j.get("result", "")),
+    return {"label": 1, "arm": arm or ("voice" if voice else "model"), "text": excerpt(j.get("result", "")),
             "gen_cost": j.get("total_cost_usd", 0), "pair": doc["path"]}
 
 
-def matched(n: int, gen_model: str, jobs: int) -> list[dict]:
+def matched(n: int, gen_model: str, jobs: int, variant: Path | None = None) -> list[dict]:
     from tells_mine import H
     rng = random.Random(11)
     pool = []
@@ -114,9 +114,11 @@ def matched(n: int, gen_model: str, jobs: int) -> list[dict]:
                     pool.append({"label": 0, "arm": "human", "repo": repo.name, "path": f, "heads": headings(text),
                                  "text": excerpt(text), "pair": f})
     humans = rng.sample(pool, min(n, len(pool)))
+    jobs_ = [(h, gen_model, True, variant, variant.stem) for h in humans] if variant else \
+        [(h, gen_model, v) for h in humans for v in (False, True)]
     with cf.ThreadPoolExecutor(jobs) as ex:
-        twins = list(ex.map(lambda a: twin(*a), [(h, gen_model, v) for h in humans for v in (False, True)]))
-    return humans + [t for t in twins if len(t["text"].split()) > 120]
+        twins = list(ex.map(lambda a: twin(*a), jobs_))
+    return ([] if variant else humans) + [t for t in twins if len(t["text"].split()) > 120]
 
 
 def auc(pos: list[float], neg: list[float]) -> float:
@@ -132,11 +134,12 @@ def main() -> int:
     ap.add_argument("--report", action="store_true", help="only summarize judge.jsonl")
     ap.add_argument("--matched", action="store_true", help="topic-matched twins of human docs")
     ap.add_argument("--gen-model", default="claude-opus-5-5")
+    ap.add_argument("--variant", type=Path, help="with --matched: add twins written with this guide to judge.jsonl")
     args = ap.parse_args()
     if not args.report and args.matched:
-        docs = matched(args.n, args.gen_model, args.jobs)
+        docs = matched(args.n, args.gen_model, args.jobs, args.variant)
         random.Random(7).shuffle(docs)
-        with cf.ThreadPoolExecutor(args.jobs) as ex, OUT.open("w") as fh:
+        with cf.ThreadPoolExecutor(args.jobs) as ex, OUT.open("a" if args.variant else "w") as fh:
             for r in ex.map(lambda d: judge(d, args.model), docs):
                 fh.write(json.dumps({**r, "regex": score(r["text"], "prose")["density"]}) + "\n")
     elif not args.report:

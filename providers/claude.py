@@ -23,7 +23,9 @@ SETTINGS_ENV = {
 HOOKS = [
     ("PreToolUse", "Bash|Read|Write|Edit|MultiEdit", "guard.py", "", 10),
     ("PostToolUse", "Bash", "squeeze.py", "", 20),
+    ("PostToolUse", "WebFetch|WebSearch|mcp__.*", "inject_scan.py", "", 10),
     ("SessionStart", None, "verify.py", "", 10),
+    ("SessionStart", None, "repo_audit.py", " hook", 10),
     ("Stop", None, "verify.py", "", 180),
     ("SessionStart", None, "lessons.py", " hook session-start", 10),
     ("UserPromptSubmit", None, "lessons.py", " hook prompt", 10),
