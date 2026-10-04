@@ -14,9 +14,6 @@ SETTINGS_ENV = {
     # non-first-party ANTHROPIC_BASE_URL (proxies, routers): 63k -> 17k
     # prefix and -16% per task when forced back on.
     "ENABLE_TOOL_SEARCH": "true",
-    # 1M-context models otherwise compact at ~967k, so median requests carry
-    # 100k-270k tokens. Replaying real sessions: -18% of the bill at 300k.
-    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "300000",
 }
 
 # event -> (matcher, hook script, extra args, timeout seconds)

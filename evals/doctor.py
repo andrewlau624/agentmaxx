@@ -141,7 +141,7 @@ def main() -> int:
         advice += 1
         print(f"  {advice}. Auto-compact window {window or 'model default (~1M on [1m] models)'}: replaying your sessions at "
               f"{best[1] // 1000}k\n     saves ~{(base - best[0]) / total:.0%} of the bill. "
-              f"Set env CLAUDE_CODE_AUTO_COMPACT_WINDOW={best[1]}.")
+              f"Set env CLAUDE_CODE_AUTO_COMPACT_WINDOW={best[1]} if you can live with compaction dropping detail.")
     one_hour, five_min = simulate_ttl(sessions, 3600), simulate_ttl(sessions, 300)
     on_1h = tokens["write1h"] > tokens["write"]
     if abs(one_hour - five_min) / min(one_hour, five_min) > 0.03 and on_1h != (one_hour < five_min):

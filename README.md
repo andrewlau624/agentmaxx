@@ -6,7 +6,7 @@ agentmaxx is the guardrail set I install across Claude Code, Codex, and OpenCode
 
 What it installs:
 
-1. **Settings that shrink resident context.** `ENABLE_TOOL_SEARCH=true` defers tool schemas (Claude Code silently turns this off behind any proxy `ANTHROPIC_BASE_URL`; forcing it back on took my prefix from 63k to 17k tokens). `CLAUDE_CODE_AUTO_COMPACT_WINDOW=300000` stops 1M-context models from carrying ~1M tokens before compacting. Values you've already set win.
+1. **Settings that shrink resident context.** `ENABLE_TOOL_SEARCH=true` defers tool schemas (Claude Code silently turns this off behind any proxy `ANTHROPIC_BASE_URL`; forcing it back on took my prefix from 63k to 17k tokens). Values you've already set win. The full 1M context is left alone; `doctor` prices an earlier compact window from your own sessions if you want one.
 2. **A short output contract** (~1.8k chars, down from 11k) in each provider's global rules file: verdict first, no narration between tool calls, batch independent calls, delegate broad exploration, verify before claiming done.
 3. **Hooks** (Claude Code):
    - `squeeze`: large Bash output keeps errors, tracebacks, head and tail, and folds repeated log blocks. The full log is saved to a file the agent can grep. 138KB of test noise becomes 1.6KB.
@@ -38,7 +38,7 @@ On a 6-task bench with hidden-test grading (Sonnet 5.5, 3 reps), compared with s
 | tool search on | 18/18 | −16% |
 | agentmaxx v2 | 18/18 | −18% |
 
-Replaying 14 days of my real sessions, the compact window alone cuts about 18% of the bill. The squeezer cuts resident Bash output by 28%. With lessons, a correction made once was followed in 5/5 fresh sessions, against 0/5 without.
+Replaying 14 days of my real sessions, compacting at 300k instead of ~1M would cut about 18% of the bill, at the cost of dropping detail in long sessions, so it's opt-in. The squeezer cuts resident Bash output by 28%. With lessons, a correction made once was followed in 5/5 fresh sessions, against 0/5 without.
 
 Method, caveats, and what didn't work are in [evals/RESULTS.md](evals/RESULTS.md). Re-run any of it: `python3 evals/bench/run.py base v2 --reps 3`.
 
