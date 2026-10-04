@@ -138,5 +138,29 @@
    "arms/v2_settings.json": ".claude/settings.json"
   },
   "prefix": "Use the Agent tool (Explore or general-purpose subagent) to locate the relevant code and explain the failure before you edit anything. "
+ },
+ "v2_deleg_sonnet_f": {
+  "env": {
+   "ENABLE_TOOL_SEARCH": "true",
+   "CLAUDE_CODE_SUBAGENT_MODEL": "claude-sonnet-5-5",
+   "CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1"
+  },
+  "files": {
+   "{AMX}/templates/CLAUDE.md": "CLAUDE.md",
+   "arms/v2_settings.json": ".claude/settings.json"
+  },
+  "prefix": "Use the Agent tool (Explore or general-purpose subagent) to locate the relevant code and explain the failure before you edit anything. "
+ },
+ "v2_deleg_haiku_f": {
+  "env": {
+   "ENABLE_TOOL_SEARCH": "true",
+   "CLAUDE_CODE_SUBAGENT_MODEL": "claude-haiku-4-5-20251001",
+   "CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1"
+  },
+  "files": {
+   "{AMX}/templates/CLAUDE.md": "CLAUDE.md",
+   "arms/v2_settings.json": ".claude/settings.json"
+  },
+  "prefix": "Use the Agent tool (Explore or general-purpose subagent) to locate the relevant code and explain the failure before you edit anything. "
  }
 }

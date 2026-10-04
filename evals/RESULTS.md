@@ -13,15 +13,18 @@ with the scripts in this directory. Two kinds of evidence:
 
 ## Where the money goes (replay)
 
-| Line | Share of weighted cost |
+| Line | Share of cost |
 |---|---|
-| Cache reads | 58% |
-| Cache writes | 32% |
-| Output | 10% |
+| Cache reads | 48% |
+| Cache writes | 38% |
+| Output | 14% |
 
 Corrected 2026-10-03: the first version priced every cache write at 1.25x, but
 79% of writes here use the 1h TTL, billed at 2x (`python3 evals/doctor.py`,
-550 sessions over 14 days). The earlier split was 65/24/11.
+550 sessions over 14 days). The earlier split was 65/24/11. Corrected again
+the same day: costs are now in dollars at each request's model price, and
+Opus 5.5 cache hits cost 0.05x input, not 0.1x (pricing page). Most of this
+machine's spend is Opus, so reads fell from 58% to 48% (1,102 sessions).
 
 The median request carried **266k tokens** of context; 66% of requests ran
 above 200k. Sessions started with a **~86k-token fixed prefix** (tool
@@ -79,9 +82,13 @@ summary output, then a cache rewrite):
 |---|---|---|
 | ~1M (default on `[1m]` models) | −3% | 2 |
 | 400k | −23% | 83 |
-| **300k (installed default)** | **−25%** | 282 |
+| **300k (installed default)** | **−25%** (−18% at real prices, see below) | 282 |
 | 200k | −26% | 684 |
 | 150k | +4% (thrashes: 86k prefix + 33k buffer) | 2,560 |
+
+Repriced at each model's real cache-read price (Opus 5.5 reads at 0.05x),
+1,102 sessions: 300k −18.4%, 400k −18.2%, 500k −14.7%. The table above used
+0.1x for every read and overstates the saving by about a quarter.
 
 Quality, measured since: on the 10 real-repo tasks, Haiku 4.5 with
 compaction forced at ~40k tokens (`CLAUDE_CODE_AUTO_COMPACT_WINDOW=100000`,
@@ -136,7 +143,8 @@ bill. A read-dedupe hook is not worth building.
 binary; unset means 1h on a subscription, 5m on an API key or cloud
 provider). Replaying the real gaps between requests: 10,791 under 5 minutes,
 369 between 5 minutes and an hour, 75 over an hour. Forcing 5m would rewrite
-the whole context on each of the 369 and cost **+19%** despite cheaper writes.
+the whole context on each of the 369 and cost **+19%** despite cheaper writes
+(+27% at real prices).
 `doctor` runs this replay on your own transcripts and recommends switching
 only when the other TTL is more than 3% cheaper. Rewrites after more than an
 hour idle cost 7.0% of the bill, and no TTL setting avoids them.

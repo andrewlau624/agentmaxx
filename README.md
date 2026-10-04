@@ -38,7 +38,7 @@ On a 6-task bench with hidden-test grading (Sonnet 5.5, 3 reps), compared with s
 | tool search on | 18/18 | −16% |
 | agentmaxx v2 | 18/18 | −18% |
 
-Replaying 14 days of my real sessions, the compact window alone cuts about 25% of the bill. The squeezer cuts resident Bash output by 28%. With lessons, a correction made once was followed in 5/5 fresh sessions, against 0/5 without.
+Replaying 14 days of my real sessions, the compact window alone cuts about 18% of the bill. The squeezer cuts resident Bash output by 28%. With lessons, a correction made once was followed in 5/5 fresh sessions, against 0/5 without.
 
 Method, caveats, and what didn't work are in [evals/RESULTS.md](evals/RESULTS.md). Re-run any of it: `python3 evals/bench/run.py base v2 --reps 3`.
 

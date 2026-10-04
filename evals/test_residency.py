@@ -16,9 +16,9 @@ def transcript(path: Path, records: list[dict]) -> Path:
     return path
 
 
-def assistant(mid, t, u, tool=None):
+def assistant(mid, t, u, tool=None, model=None):
     content = [{"type": "tool_use", "id": tool[0], "name": tool[1], "input": tool[2]}] if tool else []
-    return {"type": "assistant", "timestamp": t, "message": {"id": mid, "usage": u, "content": content}}
+    return {"type": "assistant", "timestamp": t, "message": {"id": mid, "usage": u, "content": content, "model": model}}
 
 
 def result(tool_id, text):
@@ -68,12 +68,19 @@ class TestResidency(unittest.TestCase):
 
     def test_ttl_replay_turns_gaps_into_rewrites(self):
         s = residency.load(transcript(self.path, [
-            assistant("m1", "2026-10-01T00:00:00Z", usage(0, 10_000)),
-            assistant("m2", "2026-10-01T00:20:00Z", usage(10_000, 0)),
+            assistant("m1", "2026-10-01T00:00:00Z", usage(0, 10_000), model="claude-sonnet-5-5"),
+            assistant("m2", "2026-10-01T00:20:00Z", usage(10_000, 0), model="claude-sonnet-5-5"),
         ]))
-        # 20-minute gap: hit under 1h (10k write at 2 + 10k read at 0.1), miss under 5m (20k writes at 1.25)
-        self.assertEqual(simulate_ttl([s], 3600), 21_000)
-        self.assertEqual(simulate_ttl([s], 300), 25_000)
+        # Sonnet 5.5, $2/MTok input. 20-minute gap: hit under 1h (10k write at 2x + 10k read at 0.1x),
+        # miss under 5m (20k writes at 1.25x)
+        self.assertEqual(simulate_ttl([s], 3600), 42_000)
+        self.assertEqual(simulate_ttl([s], 300), 50_000)
+
+    def test_opus_5_5_reads_at_half_the_usual_multiple(self):
+        u = {**usage(1_000_000, 0), "model": "claude-opus-5-5"}
+        self.assertEqual(residency.request_cost(u), 200_000)  # $0.20/MTok
+        self.assertEqual(residency.request_cost({**u, "model": "claude-sonnet-5-5"}), 200_000)
+        self.assertEqual(residency.request_cost({**u, "model": "claude-haiku-4-5-20251001"}), 100_000)
 
 
 if __name__ == "__main__":

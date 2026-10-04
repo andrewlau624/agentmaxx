@@ -15,7 +15,7 @@ SETTINGS_ENV = {
     # prefix and -16% per task when forced back on.
     "ENABLE_TOOL_SEARCH": "true",
     # 1M-context models otherwise compact at ~967k, so median requests carry
-    # 100k-270k tokens. Replaying real sessions: -25% of the bill at 300k.
+    # 100k-270k tokens. Replaying real sessions: -18% of the bill at 300k.
     "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "300000",
 }
 

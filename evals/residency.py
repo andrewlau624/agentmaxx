@@ -19,6 +19,34 @@ from pathlib import Path
 
 PROJECTS = Path.home() / ".claude" / "projects"
 WEIGHTS = {"input_tokens": 1.0, "cache_creation_input_tokens": 1.25, "cache_read_input_tokens": 0.1, "output_tokens": 5.0}
+# $ per MTok of input, and cache reads as a multiple of input, from the pricing page on 2026-10-03:
+# Opus 5.5 cache hits are 0.05x, Fable/Mythos 5.1 0.025x, everything else 0.1x. Writes and output keep
+# the 1.25x/2x/5x multiples on every model. First matching prefix wins.
+PRICES = [("claude-opus-5-5", 4.0, 0.05), ("claude-fable-5-1", 10.0, 0.025), ("claude-mythos-5-1", 10.0, 0.025),
+          ("claude-fable-5", 10.0, 0.1), ("claude-mythos-5", 10.0, 0.1), ("claude-opus-4-1", 15.0, 0.1),
+          ("claude-opus-4-0", 15.0, 0.1), ("claude-opus", 5.0, 0.1), ("claude-sonnet-5", 2.0, 0.1),
+          ("claude-sonnet", 3.0, 0.1), ("claude-haiku-4", 1.0, 0.1), ("claude-haiku", 0.8, 0.1)]
+
+
+def price(u: dict) -> tuple[float, float]:
+    """(input $/MTok, cache-read multiple) for the model that served this request; unknown models count as Opus 5.5."""
+    model = u.get("model") or ""
+    return next(((p, rd) for prefix, p, rd in PRICES if model.startswith(prefix)), (4.0, 0.05))
+
+
+def request_cost(u: dict, write_mult: float | None = None) -> float:
+    """$ per million of this request's tokens; 1h writes at 2x unless write_mult overrides every write."""
+    p, rd = price(u)
+    hour = (u.get("cache_creation") or {}).get("ephemeral_1h_input_tokens", 0) or 0
+    write = u.get("cache_creation_input_tokens", 0) or 0
+    writes = write * write_mult if write_mult else (write - hour) * 1.25 + hour * 2.0
+    return p * ((u.get("input_tokens", 0) or 0) + writes + (u.get("cache_read_input_tokens", 0) or 0) * rd
+                + (u.get("output_tokens", 0) or 0) * 5.0)
+
+
+def read_rate(u: dict) -> float:
+    p, rd = price(u)
+    return p * rd
 CHARS_PER_TOKEN = 3.6
 WRITERS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 
@@ -54,7 +82,7 @@ def load(path: Path) -> dict | None:
             if mid not in usage:
                 order.append(mid)
                 times[mid] = ts(r)
-            usage[mid] = m.get("usage") or {}
+            usage[mid] = {**(m.get("usage") or {}), "model": m.get("model") or ""}
             for b in m.get("content") or []:
                 if isinstance(b, dict) and b.get("type") == "tool_use":
                     uses[b.get("id")] = (b.get("name", "?"), b.get("input") or {})
@@ -113,7 +141,7 @@ def analyze(sessions: list[dict]) -> dict:
     bust_cost = Counter()
     for s in sessions:
         n = len(s["usage"])
-        total += sum(u.get(k, 0) * w for u in s["usage"] for k, w in WEIGHTS.items())
+        total += sum(request_cost(u) for u in s["usage"])
         # residency ends at the next compaction, or at session end
         compacts = sorted(i for kind, i, *_ in s["events"] if kind == "compact")
         seen: dict[str, set] = defaultdict(set)  # path -> (offset, limit) ranges shown since the last write
@@ -122,7 +150,7 @@ def analyze(sessions: list[dict]) -> dict:
                 continue
             _, at, name, inp, size = ev
             end = next((c for c in compacts if c > at), n)
-            cost = size / CHARS_PER_TOKEN * max(0, end - at) * 0.1
+            cost = size / CHARS_PER_TOKEN * max(0, end - at) * read_rate(s["usage"][min(at, n - 1)])
             tool = name.split("__")[1] if name.startswith("mcp__") else name
             by_tool[tool] += cost
             path = inp.get("file_path") if isinstance(inp, dict) else None
@@ -144,7 +172,7 @@ def analyze(sessions: list[dict]) -> dict:
                 kind = "idle>1h" if gap > 3600 else "idle>5m" if gap > 300 else "other"
                 busts[kind] += 1
                 # extra cost vs reading the same tokens from cache
-                bust_cost[kind] += cw * (1.25 - 0.1)
+                bust_cost[kind] += cw * (1.25 * price(u)[0] - read_rate(u))
     return {"total": total, "by_tool": by_tool, "reread": reread, "reread_calls": reread_calls,
             "busts": busts, "bust_cost": bust_cost}
 

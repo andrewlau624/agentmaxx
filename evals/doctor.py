@@ -21,8 +21,7 @@ import residency  # noqa: E402
 
 PROJECTS = Path.home() / ".claude" / "projects"
 SETTINGS = Path.home() / ".claude" / "settings.json"
-# Weighted index: input 1, cache write 1.25 (5m TTL) or 2 (1h TTL), cache read 0.1, output 5.
-WEIGHTS = {"input": 1.0, "write": 1.25, "write1h": 2.0, "read": 0.1, "output": 5.0}
+# Costs are $ per million tokens at each request's model price (residency.PRICES).
 COMPACT_BUFFER = 33_000
 
 
@@ -46,12 +45,12 @@ def simulate_window(sessions: list[dict], window: int | None, summary: int = 12_
     for s in sessions:
         contexts = [context_of(u) for u in s["usage"]]
         offset, prefix = 0, contexts[0]
-        for c in contexts:
+        for c, u in zip(contexts, s["usage"]):
             effective = c - offset
             if window and effective > window - COMPACT_BUFFER:
-                total += effective * 0.1 + summary * 5 + summary * 1.25
+                total += effective * residency.read_rate(u) + summary * (5 + 1.25) * residency.price(u)[0]
                 offset, effective = c - (prefix + summary), prefix + summary
-            total += effective * 0.1
+            total += effective * residency.read_rate(u)
     return total
 
 
@@ -65,7 +64,7 @@ def simulate_ttl(sessions: list[dict], ttl: int) -> float:
             write = u.get("cache_creation_input_tokens", 0) or 0
             if i and read and s["times"][i] - s["times"][i - 1] > ttl:
                 write, read = write + read, 0
-            total += (u.get("input_tokens", 0) or 0) + write * price + read * 0.1 + (u.get("output_tokens", 0) or 0) * 5
+            total += residency.request_cost({**u, "cache_creation_input_tokens": write, "cache_read_input_tokens": read}, price)
     return total
 
 
@@ -86,7 +85,7 @@ def main() -> int:
     settings = json.loads(SETTINGS.read_text()) if SETTINGS.exists() else {}
     env = {**settings.get("env", {}), **{k: v for k, v in os.environ.items() if k.startswith(("ENABLE_", "CLAUDE_", "ANTHROPIC_"))}}
 
-    tokens = Counter()
+    tokens, weighted = Counter(), Counter()
     for s in sessions:
         for u in s["usage"]:
             tokens["input"] += u.get("input_tokens", 0) or 0
@@ -95,7 +94,12 @@ def main() -> int:
             tokens["write"] += (u.get("cache_creation_input_tokens", 0) or 0) - hour
             tokens["read"] += u.get("cache_read_input_tokens", 0) or 0
             tokens["output"] += u.get("output_tokens", 0) or 0
-    weighted = {k: tokens[k] * w for k, w in WEIGHTS.items()}
+            p, rd = residency.price(u)
+            weighted["input"] += (u.get("input_tokens", 0) or 0) * p
+            weighted["write"] += ((u.get("cache_creation_input_tokens", 0) or 0) - hour) * 1.25 * p
+            weighted["write1h"] += hour * 2.0 * p
+            weighted["read"] += (u.get("cache_read_input_tokens", 0) or 0) * rd * p
+            weighted["output"] += (u.get("output_tokens", 0) or 0) * 5.0 * p
     total = sum(weighted.values())
     contexts = [context_of(u) for s in sessions for u in s["usage"]]
     prefixes = [context_of(s["usage"][0]) for s in sessions if not s["subagent"]]
@@ -155,7 +159,8 @@ def main() -> int:
         advice += 1
         print(f"  {advice}. Bash output is {tool_tokens['Bash'] / sum(tool_tokens.values()):.0%} of tool-result tokens. "
               "Install the agentmaxx squeeze hook (make install).")
-    listing = sum(tok * (1.8 + 0.1 * max(0, len(s["usage"]) - at)) for s in sessions
+    listing = sum(tok * (1.8 * residency.price(s["usage"][0])[0] + residency.read_rate(s["usage"][0]) * max(0, len(s["usage"]) - at))
+                  for s in sessions
                   for kind, at, *rest in s["events"] if kind == "skills" for tok in rest[:1])
     if listing / total > 0.015:
         used = {rest[0] for s in sessions for kind, _, *rest in s["events"] if kind == "invoked" and rest}
