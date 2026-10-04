@@ -73,6 +73,15 @@ def main() -> int:
             skill_file.unlink()
             removed += 1
 
+    # gstack's top-level copies are symlinks into gstack/; drop the ones left dangling.
+    for root in ROOTS:
+        if not root.is_dir():
+            continue
+        for link in root.glob("*/SKILL.md"):
+            if link.is_symlink() and not link.exists():
+                touched_dirs.add(link.parent)
+                link.unlink()
+
     # Remove directories that only existed to hold deleted skills.
     for directory in sorted(touched_dirs, key=lambda p: -len(p.parts)):
         current = directory
