@@ -532,3 +532,42 @@ Not shipped from this session: a parallel session is editing the same
 doctor block (it added `installed_skills()`, an `updates` dict and the
 never-invoked list while this iteration ran). The item is theirs; the
 numbers above are for them. No bench spend.
+
+## Iteration 18 (2026-10-22): claude-md skill, applied to the two fat files (free)
+
+Picked over everything else because doctor's prefix breakdown (iteration
+16) put 28k of the 87k-token prefix in the user's own CLAUDE.md files, and
+the user asked for a docs skill. Hypothesis: a mechanical split of CLAUDE.md
+into per-turn rules plus on-demand docs cuts the attached instructions by
+85%+ without dropping a user-stated rule.
+
+Shipped `skills/claude-md/`: `measure.py` splits on `##`, classifies each
+section (standing rule by heading, log/findings by heading, too long,
+code/tables, rule-shaped line share), prints the proposal, and on `--apply`
+writes a byte-exact backup, one file per moved section, an INDEX.md with one
+line per file, hoists `###` subsections that read like user-stated rules
+into CLAUDE.md, and leaves a pointer that tells future sessions where
+findings go. Tests in `test_measure.py` (`make test` runs them).
+
+Applied (`python3 skills/claude-md/measure.py <repo>/CLAUDE.md --apply`):
+
+| Repo | Before | After | Moved | Hoisted |
+|---|---|---|---|---|
+| trading-lab | 57,282 tok (208k chars, untracked file) | 4,146 tok | 16 files, 53.5k tok | 15.4 quality gates |
+| swing-trader (`--keep 3 4 5`) | 31,124 tok (116k chars) | 5,104 tok | 46 files, 26.2k tok | data-buy rule |
+
+Every non-heading line of both originals is in CLAUDE.md or a moved file
+(checked by set difference; the only misses are the 16 and 46 `##` headings
+that became file titles). Backups: `docs/memory/CLAUDE.md.<stamp>.before-diet`.
+Cache reads alone, per request: trading-lab 5.7k -> 0.4k token-equivalents,
+swing-trader 3.1k -> 0.5k. Both repos' files are left uncommitted for the
+user to review; both research loops wrote their session notes into
+CLAUDE.md, which is how the files got there.
+
+Not measured: whether the research agents still avoid "exhausted" lines
+after the split. The do-not-redo lists stayed in CLAUDE.md and the pointer
+makes the index a required read before proposing an experiment; a live
+check needs a research-loop run in those repos, which is the user's call.
+Kept sections are still over the 2k budget (4.1k and 5.1k); the skill's
+step 4 (tighten by hand) was not done here to keep the change mechanical
+and reviewable.

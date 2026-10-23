@@ -67,6 +67,7 @@ Command wrapping exists only as the explicit `better-compress --run` CLI, never 
 
 ## What else comes with it
 
+- **claude-md** skill: measures a CLAUDE.md section by section, moves logs and reference material into `docs/memory/` behind a one-line index, keeps and hoists user-stated rules, backs up first. On this machine: 57k -> 4.1k and 31k -> 5.1k tokens, nothing deleted
 - **code-review** skill that remembers your review nits and style preferences in plain markdown, with a probation system so the list never bloats
 - **fast-commit** skill: one call gathers git state, one silent step writes the message, one call commits
 - **human-voice** skill, distilled from Wikipedia's "Signs of AI writing", for docs and anything else that should read like a person wrote it

@@ -368,3 +368,14 @@ tool ignored `tool_output.max_bytes` six times (24k to 65k results, all
 against the spill directory). The registered `better_*` tools were called
 240 times against 5,147 bash calls. The plugin now runs the same squeeze on
 bash and grep results after they return.
+
+## CLAUDE.md diet (applied, 2026-10-22)
+
+`skills/claude-md/measure.py --apply` on the two files doctor flagged:
+trading-lab 57,282 -> 4,146 tokens (16 files moved to `docs/memory/`),
+swing-trader 31,124 -> 5,104 tokens (46 files). Every non-heading line of
+the originals is in CLAUDE.md or a moved file; a byte-exact backup sits
+next to the docs. User-stated `###` rules inside moved sections were copied
+back into CLAUDE.md (one per repo). The skill's manual tightening step was
+not run, so both are still above the 2k target. Effect on agent behavior in
+those repos is not measured.

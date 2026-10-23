@@ -43,6 +43,7 @@ test:
 	python3 -m unittest discover -s tools -p "test_*.py"
 	python3 -m unittest discover -s evals -p "test_*.py" -t .
 	python3 -m unittest discover -s hooks -p "test_*.py"
+	python3 -m unittest discover -s skills/claude-md -p "test_*.py"
 
 telemetry:
 	python3 evals/token_telemetry.py
