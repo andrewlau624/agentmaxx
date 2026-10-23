@@ -394,6 +394,7 @@ is not worth its own prefix cost.
 10 real tasks x 2 reps per arm, `claude-opus-5-5`, per-task medians then
 mean, bootstrap 90% CI. `CLAUDE_CODE_EFFORT_LEVEL=low`: -32% cost per task
 (CI -55% to -13%) but pass 16/20 vs 18/20; one task fails only under low.
-Reverted. `medium`: 18/20, -11% (CI -24% to +1%), parked as inconclusive.
-Output tokens per run 3,844 default, 3,376 medium, 1,998 low. The same
+Reverted. `medium` at 3 reps: 26/30 vs 26/30, -1% (CI -12% to +8%);
+no effect on cost, output tokens -8%. Parked. Output tokens per run
+3,687 default, 3,399 medium, 1,998 low (low at 2 reps). The same
 knob did nothing on Sonnet 5.5.

@@ -678,3 +678,21 @@ loss shows up on harder tasks than this bench has. One more rep per cell
 (~$4.50) would likely close the CI; that is the user's call past the cap.
 Analysis: evals/bench/analyze.py with MODEL=claude-opus-5-5, or the inline
 script in this iteration's transcript (same method).
+Third rep on v2 and v2_medium: 20 runs x ~$0.23 = ~$4.70 (est, logged before the run).
+
+Third rep ($4.49 actual; cumulative ~$87): medium's edge disappears.
+
+| Arm (3 reps) | Pass | $/task | vs v2 | 90% CI | Output tok/run |
+|---|---|---|---|---|---|
+| v2 | 26/30 | 0.215 | | | 3,687 |
+| v2_medium | 26/30 | 0.213 | -1% | -12% to +8% | 3,399 |
+
+The two-rep -11% was two expensive v2 runs on mistune-emphasis-mod3 and
+table-delimiter-row; with a third rep the per-task medians line up. The
+table-delimiter task also failed once under default in rep 3, so it is
+flaky, which softens the "low breaks it" reading too: low's 16/20 is still
+the worse number, but the gap is one flaky task. Decision: park effort
+level entirely. Medium cuts output tokens 8% and nothing else; low is the
+only arm that moves the bill and it costs a pass. Nothing ships; no
+settings change, no doctor recommendation. Queue item 4 closed.
+No-ship count: 1 (iteration 20 shipped).
