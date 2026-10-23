@@ -514,3 +514,21 @@ Budget: ~$10 before the $80 cap. Items 1 and 2 above are done.
 4. Opus effort batch (~$12; thinking is 32% of output here).
 5. Harder tasks where Sonnet fails.
 6. Prompt-injection scan of WebFetch/MCP output; `.claude/` supply chain.
+
+## Iteration 17 (2026-10-22): skill listing, measured then handed over
+
+Queue item 1. 30 days, 1,073 transcripts: the initial skill listing is
+28,299 chars (61 listed skills on this machine, 126 names seen across
+sessions as plugins came and went). The model invoked 16 skills on its own
+in 30d (`loop` 13, `hallmark` 8, `page-rules` 8, `deep-research` 5, the
+rest 1-3). 44 of 60 listed skills were never model-invoked: 15,270 of
+24,126 description chars, about 3.8k tokens on every request and every
+subagent prefix. `skillOverrides`, `user-invocable-only` and
+`disable-model-invocation` are all present in the 2.1.309 binary.
+`residency.load` now keeps per-skill description sizes on the `skills`
+event (4th element) so doctor can price the hidden set.
+
+Not shipped from this session: a parallel session is editing the same
+doctor block (it added `installed_skills()`, an `updates` dict and the
+never-invoked list while this iteration ran). The item is theirs; the
+numbers above are for them. No bench spend.

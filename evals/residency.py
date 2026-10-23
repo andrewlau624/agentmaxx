@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import time
 from collections import Counter, defaultdict
 from datetime import datetime
@@ -75,7 +76,9 @@ def load(path: Path) -> dict | None:
             events.append(("compact", len(order)))
         a = r.get("attachment") or {}
         if a.get("type") == "skill_listing":
-            events.append(("skills", len(order), len(a.get("content") or "") / CHARS_PER_TOKEN))
+            content = a.get("content") or ""
+            per_skill = {m.group(1): len(line) for line in content.splitlines() if (m := re.match(r"- ([\w:.-]+):", line))}
+            events.append(("skills", len(order), len(content) / CHARS_PER_TOKEN, per_skill if a.get("isInitial") else {}))
         if a.get("type") == "instructions":
             # CLAUDE.md files Claude Code attached (first turn, and again when they change or a new dir is entered)
             for f in a.get("files") or []:
