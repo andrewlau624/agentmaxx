@@ -146,7 +146,9 @@ provider). Replaying the real gaps between requests: 10,791 under 5 minutes,
 the whole context on each of the 369 and cost **+19%** despite cheaper writes
 (+27% at real prices).
 `doctor` runs this replay on your own transcripts and recommends switching
-only when the other TTL is more than 3% cheaper. Rewrites after more than an
+only when a uniform TTL beats what you actually paid by more than 3% (an
+already-mixed machine, main 1h with 5m subagents, beats both uniform settings,
+so it stays silent). Rewrites after more than an
 hour idle cost 7.0% of the bill, and no TTL setting avoids them.
 
 ## Machine-writing tells: sources and measurement

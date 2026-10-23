@@ -129,6 +129,12 @@ tools:
     usage: better_contract.py PATH [--format json|openapi]
     note: "Extract API contracts from route files in one call. ~150-250 tokens savings per service."
 
+  - name: better-compress
+    script: better-compress/better_compress.py
+    description: Route text to the best compressor for its shape (JSON via headroom when installed, else vendored crush; logs/diffs via the squeeze engine); --run executes commands under lowfat.
+    usage: better_compress.py [--file PATH | stdin] [--command CMD] [--budget N] [--backend auto|headroom|builtin] [--json]; better_compress.py --run COMMAND [ARGS ...]
+    note: "Optional backends degrade to a stdlib-only builtin. Never empty, never expands."
+
   - name: better-structure
     script: better-structure/better_structure.py
     description: Architecture graph generator. Show dependency tree, entry points, and layers.

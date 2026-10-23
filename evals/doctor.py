@@ -78,6 +78,17 @@ def pct(values: list[int], q: float) -> int:
     return values[int(q * (len(values) - 1))] if values else 0
 
 
+def best_uniform_ttl(total: float, five_min: float, one_hour: float) -> tuple[str, float] | None:
+    """(ttl, savings fraction) when a uniform switch beats the observed bill by >3%.
+
+    Compares against what you actually paid, not against the other
+    counterfactual: on a machine already mixed (main 1h, subagents 5m),
+    neither uniform switch wins even though 1h beats 5m head-to-head.
+    """
+    ttl, cost = ("1h", one_hour) if one_hour < five_min else ("5m", five_min)
+    return (ttl, (total - cost) / total) if (total - cost) / total > 0.03 else None
+
+
 def installed_skills() -> set[str]:
     """Frontmatter names of every SKILL.md in the user skill trees."""
     names = set()
@@ -250,13 +261,12 @@ def main() -> int:
               f"{best[1] // 1000}k\n     saves ~{(base - best[0]) / total:.0%} of the bill. "
               f"Set env CLAUDE_CODE_AUTO_COMPACT_WINDOW={best[1]} if you can live with compaction dropping detail.")
     one_hour, five_min = simulate_ttl(sessions, 3600), simulate_ttl(sessions, 300)
-    on_1h = tokens["write1h"] > tokens["write"]
-    if abs(one_hour - five_min) / min(one_hour, five_min) > 0.03 and on_1h != (one_hour < five_min):
+    if rec := best_uniform_ttl(total, five_min, one_hour):
         advice += 1
-        better, worse = ("1h", five_min) if one_hour < five_min else ("5m", one_hour)
+        better, saved = rec
         updates["CLAUDE_CODE_PROMPT_CACHE_TTL"] = better
         print(f"  {advice}. Cache TTL: replaying your request gaps, {better} costs "
-              f"{1 - min(one_hour, five_min) / worse:.0%} less than what you run now.\n"
+              f"{saved:.0%} less than what you run now.\n"
               f"     Set env CLAUDE_CODE_PROMPT_CACHE_TTL={better}.")
     sub_writes = Counter()
     for s in sessions:

@@ -1,4 +1,4 @@
-.PHONY: install stage test telemetry prune doctor
+.PHONY: install stage test telemetry prune doctor compress-deps
 
 AGENTMAXX = $(HOME)/.agentmaxx/agentmaxx.py
 
@@ -52,3 +52,13 @@ prune:
 
 doctor:
 	python3 evals/doctor.py
+
+compress-deps:
+	@test -d "$(HOME)/.agentmaxx/.venv" || python3 -m venv "$(HOME)/.agentmaxx/.venv"
+	@"$(HOME)/.agentmaxx/.venv/bin/pip" install -q headroom-ai
+	@if command -v cargo >/dev/null; then \
+		cargo install -q --root "$(HOME)/.local" lowfat; \
+	else \
+		echo "cargo not found: install Rust, then run: cargo install --root ~/.local lowfat"; \
+	fi
+	@echo "backends ready (headroom in ~/.agentmaxx/.venv, lowfat in ~/.local/bin); enable with AGENTMAXX_SQUEEZE_ROUTER=1"

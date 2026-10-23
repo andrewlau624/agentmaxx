@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 from providers import PROVIDERS
@@ -108,10 +109,15 @@ def main() -> None:
 
     subparsers.add_parser(
         "doctor",
-        help="Show where your Claude Code tokens go and what to change.",
+        help="Show where your Claude Code tokens go and what to change. Extra args pass through to evals/doctor.py.",
     )
 
-    args = parser.parse_args()
+    # `doctor` forwards everything after it (argparse can't express "the rest
+    # is opaque" after a subcommand), so split before parsing.
+    argv, passthrough = sys.argv[1:], []
+    if argv[:1] == ["doctor"]:
+        argv, passthrough = ["doctor"], argv[1:]
+    args = parser.parse_args(argv)
 
     if args.command == "install":
         install_global(args.provider)
@@ -119,9 +125,8 @@ def main() -> None:
         init(args.provider)
     elif args.command == "doctor":
         import runpy
-        import sys
 
-        sys.argv = [sys.argv[0]]
+        sys.argv = [sys.argv[0], *passthrough]
         runpy.run_path(str(ROOT / "evals" / "doctor.py"), run_name="__main__")
 
 

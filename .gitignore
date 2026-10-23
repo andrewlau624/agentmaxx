@@ -4,6 +4,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .venv/
+.lowfat/
 
 # graymatter runtime state (machine-local)
 .graymatter/gray.db

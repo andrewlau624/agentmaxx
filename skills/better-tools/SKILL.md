@@ -29,6 +29,7 @@ Installed at `{{TOOLS_ROOT}}`. Signatures below; never call `--help`.
 | better-diff | Ranked diffs, bounded output | `python3 {{TOOLS_ROOT}}/better-diff/better_diff.py PATH [--since TIME \| --commits N]` |
 | better-contract | Routes, schemas, handlers | `python3 {{TOOLS_ROOT}}/better-contract/better_contract.py PATH [--format json\|openapi]` |
 | better-structure | Architecture graph, dependency tree | `python3 {{TOOLS_ROOT}}/better-structure/better_structure.py [--path P] [--max-depth N] [--show-cycles]` |
+| better-compress | Compress text via best engine for its shape | `python3 {{TOOLS_ROOT}}/better-compress/better_compress.py [--file P] [--command CMD] [--budget N] [--backend auto\|headroom\|builtin] [--json]` or `--run CMD...` |
 
 Workflow: known area → `better-context` keywords, read top results, follow imports/callers, implement. Unknown area → `better-explore "task"`, then switch to `better-context` on the top candidate. Multiple unrelated patterns → one `better-grep` call with several queries. Edits → one batched `better-edit` call (atomic validation). Verification → `better-check`; history → `better-git`/`better-blame`. Once a file is identified, stop using `better-explore`.
 

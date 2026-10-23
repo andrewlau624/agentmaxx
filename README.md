@@ -14,8 +14,8 @@ What it installs:
    - `verify`: before the agent says it's done, runs your tests. It only blocks on failures that weren't already failing when the session started, and it blocks at most once.
    - `lessons`: when you correct the agent, it records the rule as one line. Every later session in that repo starts with it, across clones and worktrees.
    - A statusline: context used against the compact window, cache hit rate, cost.
-4. **`agentmaxx doctor`** reads your transcripts and tells you which of these matter on your machine, with numbers: where the cost goes, what the fixed prefix is made of (your CLAUDE.md files, the skill listing, MCP instructions), which CLAUDE.md is over 8k tokens, what the subagent TTL, the compaction window and the main-thread TTL would cost you.
-5. Twenty-one `better-*` CLI tools (ranked search, bounded reads, batched edits, call graphs, parallel checks, output compression), described in an on-demand `better-tools` skill instead of the always-loaded contract. opencode and Codex still register them natively; Claude Code doesn't, because the bench showed the model never called them and the late-connecting MCP server forced full cache rewrites.
+4. **`agentmaxx doctor`** reads your transcripts and tells you which of these matter on your machine, with numbers: where the cost goes, what the fixed prefix is made of (your CLAUDE.md files, the skill listing, MCP instructions), which CLAUDE.md is over 8k tokens, what the subagent TTL, the compaction window and the main-thread TTL would cost you. `agentmaxx doctor --dry-run` previews writing the env-var recommendations to settings.json, and `--apply` does it: backup first, and it never overwrites a value you set.
+5. Twenty-one `better-*` CLI tools (ranked search, bounded reads, batched edits, call graphs, parallel checks, output compression), described in an on-demand `better-tools` skill instead of the always-loaded contract. opencode and Codex still register them natively; Claude Code doesn't, because the bench showed the model never called them and the late-connecting MCP server forced full cache rewrites. One of them, `better-compress`, routes each output to the best compressor for its shape: JSON to headroom when installed, else a vendored crusher; logs and diffs through the squeeze engine. Its `--run` mode executes a command under lowfat.
 6. **opencode plugin**: the same squeeze runs on `bash` and `grep` results after they return (opencode's own `tool_output.max_bytes` keeps only the tail and the built-in `grep` tool ignores it; I saw 65k-char grep results), plus a read guard that redirects whole-file reads over 12KB to ranged ones.
 
 ## Install
@@ -27,7 +27,7 @@ agentmaxx doctor
 
 Everything stages into `~/.agentmaxx`, then each detected provider gets wired up. Restart your agents after — hosts only load plugins, hooks, and MCP servers at startup. Installs are idempotent: the contract lives between `agentmaxx:start/end` markers, agentmaxx only replaces its own hook entries in `settings.json` (a backup is written the first time), and lessons live in `~/.local/share/agentmaxx` so reinstalls never wipe them.
 
-Turn pieces off per shell with `AGENTMAXX_VERIFY=0`, or pin the test command for a repo in `.agentmaxx/verify`. Squeeze thresholds are `AGENTMAXX_SQUEEZE_THRESHOLD` / `_BUDGET` (content, default 8000/6000) and `AGENTMAXX_SQUEEZE_NOISY_THRESHOLD` / `_NOISY_BUDGET` (default 3000/2000). Manage lessons with `python3 ~/.claude/agentmaxx/hooks/lessons.py list|vote ID up|down|rm ID`.
+Turn pieces off per shell with `AGENTMAXX_VERIFY=0`, or pin the test command for a repo in `.agentmaxx/verify`. Squeeze thresholds are `AGENTMAXX_SQUEEZE_THRESHOLD` / `_BUDGET` (content, default 8000/6000) and `AGENTMAXX_SQUEEZE_NOISY_THRESHOLD` / `_NOISY_BUDGET` (default 3000/2000). Set `AGENTMAXX_SQUEEZE_ROUTER=1` to route outputs that parse as JSON through `better-compress`. Manage lessons with `python3 ~/.claude/agentmaxx/hooks/lessons.py list|vote ID up|down|rm ID`.
 
 ## Does it work
 
@@ -54,7 +54,7 @@ Replaying 14 days of my own sessions (61 main, 274 subagents, 15,530 requests):
 
 The squeezer, replayed over 6,541 Bash outputs with the shipped defaults, touches 0.3% of them and keeps 91% of error and verdict lines in the ones it touches. Set the content threshold to 3k and it touches 11.7%, cuts resident Bash chars by 22% (35% in subagents), and keeps 71% of verdict lines. Of 693 outputs the earlier version squeezed, 0 were re-run verbatim and 34 were followed by a grep of the spill file. With lessons, a correction made once was followed in 5/5 fresh sessions, against 0/5 without.
 
-Method, caveats, and what didn't work are in [evals/RESULTS.md](evals/RESULTS.md). Re-run any of it: `python3 evals/bench/run.py base v2 --reps 3`, `python3 evals/squeeze_replay.py`, `python3 evals/doctor.py`.
+Method, caveats, and what didn't work are in [evals/RESULTS.md](evals/RESULTS.md). Re-run any of it: `python3 evals/bench/run.py base v2 --reps 3`, `python3 evals/squeeze_replay.py`, `python3 evals/compress_bench.py`, `python3 evals/doctor.py`.
 
 ## Compared with lowfat
 
@@ -62,6 +62,8 @@ Method, caveats, and what didn't work are in [evals/RESULTS.md](evals/RESULTS.md
 
 - **Rewriting the command** only fires when the first word is a known command. My agent's Bash calls are `cd repo && sed -n 40,120p x.py | grep -n foo; wc -l y` chains, and `git`/`docker`/`ls`/`find` were under 5% of oversized output. Squeezing the result after it returns sees every command, keeps the exit status and stderr, and can't break a pipeline.
 - **Lossy Read compression** strips comments the model will then try to match with `Edit`, which needs the exact text. Reads are already small here (Bash is 82% of result bytes, Read 11%); the guard that matters is refusing whole-file reads, which the opencode plugin does and the contract asks for.
+
+Command wrapping exists only as the explicit `better-compress --run` CLI, never in the hook path.
 
 ## What else comes with it
 
@@ -71,6 +73,7 @@ Method, caveats, and what didn't work are in [evals/RESULTS.md](evals/RESULTS.md
 - [GrayMatter](https://github.com/angelnicolasc/graymatter) wired in for cross-session memory (add more external tools to `external/tools.json`; `make install` handles them)
 - `make prune`, which strips unused gstack skills whose descriptions would otherwise ride along in every request
 - `make telemetry` for per-session tokens and API-equivalent cost across Claude Code, Codex, and opencode
+- `make compress-deps` for the optional `better-compress` backends: headroom (JSON crush) into `~/.agentmaxx/.venv`, lowfat (command wrap) into `~/.local/bin`
 
 ## Per-repo scoping
 
@@ -95,4 +98,4 @@ That writes your personal rules file (`CLAUDE.local.md` or `AGENTS.override.md`)
 | `integrations/opencode/` | opencode plugin: better-* tools, read guard, output squeeze |
 | `mcp/` | MCP stdio server for Claude Code / Codex |
 | `external/` | Third-party tool manifest, installer, gstack pruner |
-| `evals/` | `doctor`, telemetry, `squeeze_replay`, the A/B bench, and [RESULTS.md](evals/RESULTS.md) |
+| `evals/` | `doctor`, telemetry, `squeeze_replay`, `compress_bench`, the A/B bench, and [RESULTS.md](evals/RESULTS.md) |
