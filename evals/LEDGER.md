@@ -503,7 +503,7 @@ long sessions alone. Commands: `python3 evals/doctor.py`,
 
 ## Queue (expected % of bill x confidence / cost to test)
 
-Budget: ~$10 before the $80 cap. Items 1 and 2 above are done.
+Budget: ~$10 before the $80 cap. Items 1 and 2 above are done; skill listing (1) shipped as doctor's never-invoked list; Read dedupe measured negative (iteration 19).
 
 1. Skill listing: 7.8k tokens per request and per subagent, 2.3% of the
    bill. `make prune` covers gstack only; extend it to suggest
@@ -571,3 +571,32 @@ check needs a research-loop run in those repos, which is the user's call.
 Kept sections are still over the 2k budget (4.1k and 5.1k); the skill's
 step 4 (tighten by hand) was not done here to keep the change mechanical
 and reviewable.
+
+## Iteration 19 (2026-10-22): Read dedupe, measured and parked (free)
+
+Picked because the seed queue lists a Read-dedupe hook under context
+residency and the measurement is free. Hypothesis: repeat Reads of unchanged
+files cost over 2% of resident tokens.
+
+Result: no. `python3 -m evals.reread_replay --days 14` (new, with tests):
+a Read is a repeat when the same path was Read earlier in the session with no
+Edit/Write/NotebookEdit on it, or Bash naming it, in between.
+
+| Sessions | Reads | Savable repeats (same or overlapping range) | Resident share |
+|---|---|---|---|
+| 61 main | 330 | 27 (8.2%), 14k tokens | 0.34% of all resident token-turns |
+| 279 subagents | 237 | 3 (1.3%), 12k tokens | 0.04% |
+
+Counting disjoint-range repeats too (new lines, not savable) reaches 0.69%.
+The 22 exact repeats in main sessions are ~150-char stubs from re-reading
+two PDFs. Reads over 5k tokens are 2.9% of result tokens (5.5% resident) in
+main sessions; none of them were whole-file Reads of files over 2000 lines
+(0 of 12 main, 0 of 16 subagent, line counts from today's files). WebFetch
+plus WebSearch are 1.2% of main resident token-turns, 5.5% for subagents.
+
+Decision: park. No dedupe hook; the "huge Reads and web content" item drops
+to the bottom of the queue too, since the 20% figure in the loop prompt
+does not hold on this machine (10.4% for all Reads, most of it under 5k).
+Caveat: Bash invalidation matches path or basename substrings, so savings
+are a lower bound; resident cost ignores compaction, so an upper bound.
+No-ship count: 1.

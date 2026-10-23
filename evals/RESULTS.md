@@ -379,3 +379,12 @@ next to the docs. User-stated `###` rules inside moved sections were copied
 back into CLAUDE.md (one per repo). The skill's manual tightening step was
 not run, so both are still above the 2k target. Effect on agent behavior in
 those repos is not measured.
+
+## Read dedupe (replay, 2026-10-22, negative)
+
+`python3 -m evals.reread_replay --days 14`: repeat Reads of an unchanged
+file are 8.2% of Reads in main sessions but 0.34% of resident token-turns
+(0.04% in subagents). Reads over 5k tokens are 5.5% of main resident
+token-turns, none of them whole-file reads of files over 2000 lines.
+WebFetch and WebSearch are 1.2% (main) and 5.5% (subagents). A dedupe hook
+is not worth its own prefix cost.
