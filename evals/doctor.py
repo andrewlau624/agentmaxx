@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import importlib.util
 import io
 import json
 import os
@@ -224,11 +225,15 @@ def main() -> int:
     print("\nCompression backends (better-compress router; enable: AGENTMAXX_SQUEEZE_ROUTER=1)")
     with contextlib.redirect_stderr(io.StringIO()):
         try:
-            __import__("headroom")
-            hr = "importable"
-        except ImportError:
-            venv = Path.home() / ".agentmaxx" / ".venv"
-            hr = "missing (make compress-deps)" if not venv.exists() else "venv present but not importable"
+            bc_spec = importlib.util.spec_from_file_location(
+                "better_compress_doctor", Path(__file__).resolve().parent.parent
+                / "tools" / "better-compress" / "better_compress.py")
+            bc = importlib.util.module_from_spec(bc_spec)
+            assert bc_spec.loader
+            bc_spec.loader.exec_module(bc)
+            hr = "ready" if bc.load_headroom() is not None else "missing (make compress-deps)"
+        except Exception:
+            hr = "router not found"
     print(f"  headroom (JSON crush): {hr}")
     print(f"  lowfat (command wrap): {shutil.which('lowfat') or 'missing (make compress-deps)'}")
 
