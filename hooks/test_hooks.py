@@ -247,6 +247,25 @@ class TestLessons(unittest.TestCase):
         self.assertEqual(lessons.add(path, "use pnpm never npm in this repo!"), "updated L1")
         self.assertEqual(len(lessons.load(path)), 1)
 
+    def test_render_fits_a_busy_repo_plus_globals(self):
+        # Nine 200-char repo lessons and nine global ones (the real trading-lab shape) must all be injected.
+        import os, pathlib, tempfile
+        home = tempfile.mkdtemp()
+        old_home, lessons.HOME = lessons.HOME, pathlib.Path(home) / "lessons"
+        try:
+            repo = tempfile.mkdtemp()
+            import subprocess
+            subprocess.run("git init -q && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m init",
+                           shell=True, cwd=repo, check=True)
+            for i in range(9):
+                lessons.add(lessons.path_for(repo, False), f"Repo rule {i}: " + f"word{i} " * 30)
+                lessons.add(lessons.path_for(repo, True), f"Global rule {i}: " + f"gw{i} " * 30)
+            out = lessons.render(repo)
+        finally:
+            lessons.HOME = old_home
+        self.assertEqual(out.count("(this repo,"), 9)
+        self.assertEqual(out.count("(all repos,"), 9)
+
 
 if __name__ == "__main__":
     unittest.main()

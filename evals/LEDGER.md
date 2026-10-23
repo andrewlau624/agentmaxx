@@ -696,3 +696,30 @@ level entirely. Medium cuts output tokens 8% and nothing else; low is the
 only arm that moves the bill and it costs a pass. Nothing ships; no
 settings change, no doctor recommendation. Queue item 4 closed.
 No-ship count: 1 (iteration 20 shipped).
+
+## Iteration 22 (2026-10-23): quality over savings (user redirected the goal)
+
+User: "idc abt savings anymore", wants agents faster and better. Audit of
+what agentmaxx and the user's settings trade away for cost:
+
+- Lessons cap. `INJECT_CHARS=1500` delivered 6 of 18 lessons in
+  trading-lab (0 of 9 global) and 7 of 12 in swing-trader, measured with
+  `lessons.render()` on the real files. Raised to 5000 (SessionStart only,
+  ~1.4k tokens per session); test `test_render_fits_a_busy_repo_plus_globals`
+  fails on the old cap (7 != 9) and passes now. After install: 9 + 9 and
+  3 + 9 delivered. Shipped.
+- Contract: one line under "Context is the bill" telling sessions to run
+  independent work at once and never idle on a timer. The user's most
+  frequent speed correction ("do it all at once, why do you wait so long").
+  Shipped via `make install`.
+- Settings the user should drop for quality: `CLAUDE_CODE_AUTO_COMPACT_WINDOW=300000`
+  (p90 context is 410k, compaction mid-task cost Haiku 4 points on the real
+  bench) and `CLAUDE_CODE_SUBAGENT_MODEL=claude-sonnet-5-5` + `_FORCE=1`
+  (subagents weaker than the Fable parent; shipped for -22%). The auto-mode
+  classifier blocked both Bash and Edit writes to ~/.claude/settings.json
+  from this session, so the user applies it by hand. Doctor still recommends
+  both as savings; left as is since doctor is cost-focused by design.
+- nerfguard routing (cost-aware model routing on the proxy) is the largest
+  remaining quality trade and lives outside agentmaxx.
+- Verify gate: autodetects pytest/unittest in all three research repos
+  (`verify.detect`), so the "blind in research repos" worry was wrong.

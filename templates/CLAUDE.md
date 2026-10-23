@@ -9,6 +9,7 @@
 ## Context is the bill
 Every token in context is re-sent on every later turn, so a big tool result costs its size times the remaining turns.
 - Put independent tool calls in one message. One search covering the alternatives beats several narrow ones.
+- Independent work runs at once: launch every unblocked subagent, fix, or check in the same turn instead of one at a time, and never sit on a timer while unblocked work exists.
 - Search before reading; read the relevant range, not the whole file, once a file is over ~200 lines.
 - Bound noisy commands (`| tail -50`, `-q`, `--no-pager`); grep a saved log instead of re-running a command.
 - Broad exploration ("how does X work", audits, multi-file searches) goes to a subagent that reports conclusions with file:line evidence. Delegate before exploring, not after.

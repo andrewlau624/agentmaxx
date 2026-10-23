@@ -32,7 +32,9 @@ import time
 from pathlib import Path
 
 HOME = Path(os.environ.get("AGENTMAXX_HOME", Path.home() / ".local/share/agentmaxx")) / "lessons"
-INJECT_CHARS = int(os.environ.get("AGENTMAXX_LESSONS_CHARS", "1500"))
+# Injected once per session (SessionStart), so this is ~1.4k tokens resident, not per turn.
+# 1500 dropped 12 of 18 lessons in a repo with nine of its own, including every global one.
+INJECT_CHARS = int(os.environ.get("AGENTMAXX_LESSONS_CHARS", "5000"))
 RECORD = re.compile(r"^- \[(L\d+) h=(\d+) x=(\d+) ([\d-]+)\] (.+)$")
 CORRECTION = re.compile(
     r"^(no\b|nope\b|wrong\b|stop\b)|\b(that'?s (wrong|not (what|right))|you (forgot|missed|didn'?t|keep|always|never)|"
