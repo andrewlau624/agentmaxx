@@ -296,3 +296,73 @@ correction nudge, as one imperative line.
   show it helps (see LEDGER iteration 15).
 - n=3 per cell. Differences under ~10% on a single task are noise; the
   across-task averages above are the claim.
+
+## Prefix composition, cache rewrites, squeeze v2 (replay, 2026-10-22)
+
+14 days, 61 main sessions and 274 subagent transcripts, 15,530 requests,
+deduplicated per API response (`python3 evals/doctor.py`).
+
+**The 87k prefix is mostly the user's own files.** Median first request:
+86.9k tokens. Of that, per session on average: 28.0k from attached
+`CLAUDE.md` files (one repo's is 192k chars, 43k tokens; another's 27k),
+7.8k from the skill listing (61 skills), 0.7k agent listing, 0.7k MCP
+instructions. The rest is Claude Code's system prompt and tool schemas with
+tool search on. The same CLAUDE.md files get re-attached mid-session when
+they change or a new directory is entered: another 20.1k tokens per session.
+Every one of the 274 subagents starts with the same prefix. `doctor` now
+prints this breakdown and names any CLAUDE.md over 8k tokens.
+
+**47% of cache-write tokens are mid-session prefix rewrites**, not new
+content. 22% are first requests, 31% are ordinary per-turn writes. The
+rewrites, by cause:
+
+| Cause | Requests | Tokens | Share of all writes |
+|---|---|---|---|
+| Main thread idle more than 1h (1h TTL expired) | 106 | 25.3M | 24% |
+| Subagent idle 5m to 1h (subagents run on the 5m TTL) | 163 | 20.5M | 19% |
+| Compaction | 33 | 3.0M | 3% |
+
+Subagent gaps are long test commands and parents waiting on their own
+children (median gap 9 minutes). Moving subagents to the 1h TTL does not
+pay: replaying the 274 subagent transcripts with `simulate_ttl`, 1h writes
+at 2x cost **+18.7%** against the rewrites they avoid (215 gaps between 5m
+and 1h, 4 over 1h). The main thread is the opposite case, 1h is 32% cheaper
+than 5m there, and it already runs on 1h. `doctor` prints the subagent
+number as a note, not a recommendation. Thinking is 32% of billed output
+tokens (2.8M of 8.9M) where the API reports it.
+
+**Bash output over 2k chars is file dumps, not tool chatter.** 3,567 such
+outputs (15.0MB) in 14 days: `sed` 920 (4.0MB), `cat` 514 (2.3MB), `grep`
+426 (1.7MB), python heredocs 263 (1.0MB), `ls` 153 (0.6MB). `git diff`: 9
+outputs, 0.04MB. The commands lowfat and rtk ship filters for (git, docker,
+ls, find) are under 5% of the volume here; the agent reads files through
+Bash because that is what the harness asks of it in auto mode.
+
+**Squeeze v2 replay** (`python3 evals/squeeze_replay.py`, 6,541 outputs that
+were not already squeezed, 7.7M chars, 4.03G resident chars):
+
+| Policy | Outputs touched | Result volume | Resident Bash chars | Verdict lines kept |
+|---|---|---|---|---|
+| v1: 8k threshold, no classes | 9 (0.1%) | −0.5% | −0.7% | 97% |
+| v2: class-aware thresholds + filters + redaction (shipped) | 19 (0.3%) | −0.7% | −0.8% | 91% |
+| 3k threshold for everything (`AGENTMAXX_SQUEEZE_THRESHOLD=3000`) | 764 (11.7%) | −23.6% | −22.2% | 71% |
+
+On subagent transcripts the 3k policy cuts 35% of volume and keeps 69% of
+verdict lines. The shipped default stays conservative: of the 693 outputs
+the v1 hook squeezed in these 14 days, 0 were re-run verbatim and 34 (5%)
+were followed by a grep of the spill file, which is the intended path. A
+file the model asked to read is not noise, and cutting its middle costs a
+re-read. The class-aware version squeezes test runners, package managers,
+builds, `git status`/`log`, and listings at 3k, drops filler everywhere
+(pytest dots, pip/npm download lines, git hints, diff index lines, `ls -l`
+permission columns, ANSI codes) and redacts secret-looking values on every
+Bash output. The 3k-for-everything policy is one env var away for anyone
+who wants the 22%.
+
+**opencode** (55 sessions, 5,938 requests, deepseek-v4.1-flash and
+glm-5.3-flash through opencode-go): bash is 63% of tool-result bytes
+(7.6MB), 23% of bash calls return over 2k chars, and the built-in `grep`
+tool ignored `tool_output.max_bytes` six times (24k to 65k results, all
+against the spill directory). The registered `better_*` tools were called
+240 times against 5,147 bash calls. The plugin now runs the same squeeze on
+bash and grep results after they return.

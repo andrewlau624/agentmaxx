@@ -99,6 +99,27 @@ class TestSqueeze(unittest.TestCase):
             sys.stdout, sys.stdin = real, sys.__stdin__
         self.assertEqual(out.getvalue(), "")
 
+    def test_router_off_by_default(self):
+        text = json.dumps([{"id": i, "v": "x" * 100} for i in range(300)])
+        with unittest.mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AGENTMAXX_SQUEEZE_ROUTER", None)
+            out = squeeze.process(text, "curl api/items")
+        self.assertIn("output squeezed", out)
+        self.assertNotIn("better-compress", out)
+
+    def test_router_on_crushes_json(self):
+        text = json.dumps([{"id": i, "v": "x" * 100} for i in range(300)])
+        with unittest.mock.patch.dict(os.environ, {"AGENTMAXX_SQUEEZE_ROUTER": "1"}):
+            out = squeeze.process(text, "curl api/items")
+        self.assertIn("better-compress", out)
+        self.assertLess(len(out), len(text))
+
+    def test_router_on_leaves_logs_on_squeeze(self):
+        text = "".join(f"[10:{m:02d}:00] INFO worker: compiled module_{m:03d} ok\n" * 4 for m in range(200))
+        with unittest.mock.patch.dict(os.environ, {"AGENTMAXX_SQUEEZE_ROUTER": "1"}):
+            out = squeeze.process(text, "make build")
+        self.assertNotIn("[better-compress: json", out or "")
+
 
 class TestVerify(unittest.TestCase):
     def test_failing_ids_across_runners(self):
@@ -357,3 +378,56 @@ class TestRepoAudit(unittest.TestCase):
                     sys.stdin, sys.stdout, sys.argv = stdin, stdout, argv
             self.assertIn("B10", json.loads(outs[0])["systemMessage"])
             self.assertEqual(outs[1], "")
+
+
+class TestSqueezeV2(unittest.TestCase):
+    def test_noisy_classification(self):
+        for cmd in ("cd /x && python3 -m pytest -q tests | tail -50", "uv run pytest -q", "npm install",
+                    "timeout 60 .venv/bin/python -m pytest", "git status", "ls -la && wc -l README.md"):
+            self.assertTrue(squeeze.is_noisy(cmd), cmd)
+        for cmd in ("sed -n 1,200p foo.py", "cat f | grep x", "git diff", "python3 - <<'EOF'\nprint(1)\nEOF",
+                    "ssh box 'ls'", "pytest -q && cat out.json"):
+            self.assertFalse(squeeze.is_noisy(cmd), cmd)
+
+    def test_noisy_threshold_is_lower(self):
+        text = "\n".join(f"collected item {i} ok" for i in range(200))  # ~4k chars, no signal
+        self.assertIsNone(squeeze.process(text, "sed -n 1,200p x.py", write_spill=lambda t: "/tmp/x.log"))
+        out = squeeze.process(text, "python3 -m pytest -q", write_spill=lambda t: "/tmp/x.log")
+        self.assertIn("output squeezed", out)
+        self.assertLess(len(out), squeeze.NOISY_BUDGET + 1500)
+
+    def test_filters_keep_verdicts(self):
+        lines = ["total 32", "-rw-r--r--  1 u g 4867 Oct  9 01:20 analyze.py", "-rw-r--r--  1 u g 2377 Oct  9 01:04 b.py",
+                 "drwxr-xr-x  3 u g 96 Oct  9 01:20 data", '(use "git add <file>..." to update what will be committed)',
+                 "........ [100%]", "FAILED tests/test_a.py::test_x - assert 1 == 2", "9 passed in 0.62s",
+                 "Collecting requests", "index 74974a5..2d13a5f 100644", "\x1b[31mERROR\x1b[0m boom"]
+        out = squeeze.filter_lines(lines, "ls -la")
+        self.assertEqual(out[0], "      4867 Oct  9 01:20 analyze.py")
+        self.assertIn("d       96 Oct  9 01:20 data", out)
+        self.assertIn("FAILED tests/test_a.py::test_x - assert 1 == 2", out)
+        self.assertIn("9 passed in 0.62s", out)
+        self.assertIn("ERROR boom", out)
+        self.assertEqual(len(out), 6)
+
+    def test_redaction_marks_output(self):
+        text = "ok\nexport GH=ghp_" + "a" * 36 + "\nkey AKIAABCDEFGHIJKLMNOP\nurl https://u:hunter22@db/x\n"
+        out = squeeze.process(text, "env")
+        self.assertNotIn("ghp_", out)
+        self.assertNotIn("AKIAABCDEFGHIJKLMNOP", out)
+        self.assertIn("u:[redacted]@db", out)
+        self.assertIn("3 secret-looking values redacted", out)
+        self.assertIsNone(squeeze.process("plain output\n", "echo hi"))
+
+    def test_text_mode_for_opencode(self):
+        import io, sys
+        event = {"command": "npm install", "output": "\n".join(f"npm warn deprecated pkg{i}@1: old" for i in range(400))}
+        sys.stdin, out = io.StringIO(json.dumps(event)), io.StringIO()
+        real, sys.stdout = sys.stdout, out
+        try:
+            sys.argv = ["squeeze.py", "--text"]
+            squeeze.main()
+        finally:
+            sys.stdout, sys.stdin = real, sys.__stdin__
+        result = json.loads(out.getvalue())
+        self.assertIn("output squeezed", result["output"])
+        self.assertLess(len(result["output"]), 3000)

@@ -19,6 +19,7 @@ Every token in context is re-sent on every later turn, so a big tool result cost
 - Smallest sound change. No drive-by refactors, renames, or speculative abstractions.
 - Read the relevant tests before changing behavior; never weaken a test to make it pass.
 - Never invent APIs or behavior. When evidence conflicts, say so instead of picking silently.
+- When the user hands over material to branch from (an idea, a tool, a link), list the genuinely different directions it implies first and let them pick. Do not quietly collapse it into the variant that is easiest to run with what is already on disk.
 
 ## Done means verified
 Run the narrowest check that exercises the changed behavior before claiming success. Report what was verified and what wasn't. If a fix is partial, say what remains.

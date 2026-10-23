@@ -76,6 +76,13 @@ def load(path: Path) -> dict | None:
         a = r.get("attachment") or {}
         if a.get("type") == "skill_listing":
             events.append(("skills", len(order), len(a.get("content") or "") / CHARS_PER_TOKEN))
+        if a.get("type") == "instructions":
+            # CLAUDE.md files Claude Code attached (first turn, and again when they change or a new dir is entered)
+            for f in a.get("files") or []:
+                events.append(("instructions", len(order), f.get("path", "?"), len(f.get("content") or "") / CHARS_PER_TOKEN))
+        elif a.get("type") in ("hook_success", "mcp_instructions_delta", "agent_listing_delta", "environment", "session_context"):
+            size = len(a.get("content") or "") or len(json.dumps(a.get("addedBlocks") or a.get("addedLines") or a.get("context") or ""))
+            events.append(("injected", len(order), a["type"], size / CHARS_PER_TOKEN))
         m = r.get("message") or {}
         if r.get("type") == "assistant":
             mid = m.get("id") or r.get("uuid")

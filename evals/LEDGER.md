@@ -455,3 +455,62 @@ Remaining budget before the $40 pause: ~$10 after the regression run.
 Done: hard tasks (10 real), tells detector, guard gaps, Codex/opencode key
 verification, effort on Sonnet (negative), tells bench (floor).
 Dropped: read dedupe (0.0%). Deprioritized: Read/Web squeezing (1.7% total).
+
+## Iteration 16 (2026-10-22): prefix composition, squeeze v2, subagent TTL (free, replay)
+
+Picked queue items 1 and 2 (subagent prefix and share, fixed-prefix audit)
+because both are free and the user asked for per-turn savings that leave
+long sessions alone. Commands: `python3 evals/doctor.py`,
+`python3 evals/squeeze_replay.py [--subagents]`, ad hoc scripts over
+`~/.claude/projects` (61 main sessions, 274 subagents, 15,530 requests, 14d).
+
+- Prefix is 86.9k at p50. Attachments on the first turn, per session:
+  CLAUDE.md files 28.0k tokens (trading-lab's is 192k chars, 43k tokens;
+  swing-trader's 27k), skill listing 7.8k (61 skills), agent listing 0.7k,
+  MCP instructions 0.7k. CLAUDE.md is re-attached mid-session for another
+  20.1k per session. Shipped: `residency.load` records `instructions` and
+  injected attachments; doctor prints the breakdown and flags any CLAUDE.md
+  over 8k tokens. The fix is the user's (trim the file), so no bench.
+- 47% of cache-write tokens are mid-session prefix rewrites: main idle >1h
+  25.3M (24%), subagent 5m-TTL gaps 20.5M (19%, 163 requests, median gap
+  9 min), compaction 3.0M. Hypothesis: 1h TTL for subagents cuts their cost
+  by 5%+. **Negative.** `simulate_ttl` over the 274 subagent transcripts:
+  5m 339.2M weighted, 1h 402.6M, **+18.7%**. Writes at 2x on every turn
+  outweigh 215 avoided rewrites. Main thread: 1h is 32% cheaper than 5m
+  and already on. Doctor prints the subagent number as a note; the
+  recommendation I had written earlier in the day is removed.
+  `CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL` confirmed present in 2.1.309.
+- Bash output over 2k chars (3,567 outputs, 15.0MB): sed 920 (4.0MB), cat
+  514 (2.3MB), grep 426 (1.7MB), python heredocs 263, ls 153. git/docker/
+  find together under 5%. So lowfat/rtk-style per-command filters are the
+  wrong shape for this machine; the agent reads files through Bash.
+- Squeeze v2 shipped: class-aware thresholds (noisy commands 3k, content
+  8k), filler filters, secret redaction, verdict-first budget, `--text`
+  mode, opencode `tool.execute.after` for bash and grep. Replay on 6,541
+  unsqueezed outputs: default touches 0.3%, −0.7% volume, 91% verdict
+  lines kept. `AGENTMAXX_SQUEEZE_THRESHOLD=3000` for everything: 11.7%
+  touched, −23.6% volume, −22.2% resident chars, 71% verdict lines kept
+  (subagents −35%, 69%). After the 693 squeezes already in history: 0
+  verbatim re-runs, 34 spill greps. Default stays conservative; the 3k
+  policy is an env var. Not benched live: no budget, and the default path
+  changes almost nothing.
+- Thinking is 32% of billed output (2.8M of 8.9M requests that report
+  `output_tokens_details`). Opus effort batch still parked (~$12).
+- Tests: `make test` 255/36/35 green. Another session is editing the same
+  tree (tools/better-compress, a JSON router in squeeze.py behind
+  `AGENTMAXX_SQUEEZE_ROUTER=1`); its `except Exception: pass` was narrowed
+  and now logs to stderr.
+
+## Queue (expected % of bill x confidence / cost to test)
+
+Budget: ~$10 before the $80 cap. Items 1 and 2 above are done.
+
+1. Skill listing: 7.8k tokens per request and per subagent, 2.3% of the
+   bill. `make prune` covers gstack only; extend it to suggest
+   `skillOverrides` for skills never invoked in 30d (free replay).
+2. Compact window live measurement and compaction quality (needs budget;
+   the user does not want compaction advice, so this is for others).
+3. LLM-judge pass for tells with human references.
+4. Opus effort batch (~$12; thinking is 32% of output here).
+5. Harder tasks where Sonnet fails.
+6. Prompt-injection scan of WebFetch/MCP output; `.claude/` supply chain.

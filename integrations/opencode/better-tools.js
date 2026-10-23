@@ -3,6 +3,7 @@ import { execFile } from "node:child_process"
 import { statSync } from "node:fs"
 import path from "node:path"
 
+const AGENTMAXX_HOME = process.env.AGENTMAXX_HOME ?? `${process.env.HOME}/.agentmaxx`
 const TOOLS_ROOT =
   process.env.AGENTMAXX_TOOLS_ROOT ??
   `${process.env.HOME}/.config/opencode/agentmaxx/tools`
@@ -454,6 +455,37 @@ export const BetterToolsPlugin = async () => ({
       }),
     ]),
   ),
+
+  // Same squeeze as the Claude Code hook (hooks/squeeze.py): noisy commands
+  // (tests, installs, builds, git status/log, ls/find) shrink above 3k chars,
+  // content dumps above 8k, secret-looking values are redacted, and the full
+  // text is spilled to a file the model can grep. opencode's own
+  // tool_output.max_bytes keeps the tail only; this keeps errors and verdicts.
+  // The built-in grep tool ignores max_bytes (65k results seen against the
+  // spill dir), so it goes through the same budget.
+  "tool.execute.after": async (input, output) => {
+    if (!["bash", "grep"].includes(input.tool)) return
+    const text = output?.output
+    if (typeof text !== "string" || text.length < 500) return
+    const command = input.tool === "bash" ? String(input.args?.command ?? "") : "grep"
+    const squeezed = await new Promise((resolve) => {
+      const child = execFile(
+        "python3",
+        [`${AGENTMAXX_HOME}/hooks/squeeze.py`, "--text"],
+        { maxBuffer: 32 * 1024 * 1024, timeout: 15000 },
+        (error, stdout) => {
+          if (error || !stdout) return resolve(null)
+          try {
+            resolve(JSON.parse(stdout).output ?? null)
+          } catch {
+            resolve(null)
+          }
+        },
+      )
+      child.stdin.end(JSON.stringify({ command, output: text }))
+    })
+    if (typeof squeezed === "string" && squeezed !== text) output.output = squeezed
+  },
 
   "tool.execute.before": async (input, output) => {
     const turns = (sessionTurns.get(input.sessionID) ?? 0) + 1
