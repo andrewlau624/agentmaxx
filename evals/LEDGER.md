@@ -600,3 +600,47 @@ does not hold on this machine (10.4% for all Reads, most of it under 5k).
 Caveat: Bash invalidation matches path or basename substrings, so savings
 are a lower bound; resident cost ignores compaction, so an upper bound.
 No-ship count: 1.
+
+## Iteration 20 (2026-10-22): why CLAUDE.md gets re-attached mid-session (free, shipped)
+
+Doctor's "CLAUDE.md re-attached mid-session: 20.1k tokens per session" had
+no cause attached. Replaying the `instructions` events with `at > 0` over
+14d of main sessions (`residency.load`, 61 sessions):
+
+| File | Re-attaches | Tokens added |
+|---|---|---|
+| trading-lab/CLAUDE.md | 18 | 809k |
+| swing-trader/CLAUDE.md | 14 | 396k |
+| ~/.claude/CLAUDE.md | 36 | 20k |
+| agentmaxx/CLAUDE.md | 1 | 0.2k |
+
+Every one was a file already attached at turn 0, so the cause is edits, not
+new directories. 98% of the tokens are the two research repos appending
+session notes to their own CLAUDE.md and Claude Code re-sending the whole
+43k/27k file each time. Iteration 18 already moved those notes to
+`docs/memory/` and repointed the loop prompts, so this line should drop to
+near zero on its own; doctor will show it.
+
+The 36 small ones are `make install`: `_inject_rules` rewrote
+`~/.claude/CLAUDE.md` on every run even when the block was identical, and
+the new mtime made every open session re-attach it. Fixed in
+`providers/base.py` (skip the write when bytes are equal, print `same`),
+test in `evals/test_contract_stability.py`. Worth 0.02% of the bill; shipped
+because it is one line and the mtime bump was a bug.
+
+Regression check: `make test` green (255 + 46 + 35 + 2 tests) after
+iterations 18-20.
+
+## Status after iteration 20
+
+Free, replay-measurable items at the per-turn level are exhausted on this
+machine. Everything left needs one of two things from the user:
+
+- Spend: the Opus effort batch (~$12) is the only queue item with expected
+  value above 2% of the bill (thinking is 32% of output, output 16.6% of
+  the bill), and it would push bench spend past the $80 cap. Sonnet effort
+  was already negative (iteration 4), so this is a coin flip.
+- Actions in `~/.claude`, which this loop does not touch: paste doctor's
+  `skillOverrides` block (2.3% of the bill), review and commit the dieted
+  CLAUDE.md files in trading-lab and swing-trader, restart Claude Code and
+  opencode so the squeeze v2 hook and the opencode plugin load.

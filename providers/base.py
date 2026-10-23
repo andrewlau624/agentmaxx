@@ -115,6 +115,11 @@ class Provider(ABC):
         else:
             updated = block
 
+        if updated == existing:
+            # Claude Code re-attaches a CLAUDE.md to every open session when the
+            # file changes, so an unchanged file must not get a new mtime.
+            print(f"same  {destination}")
+            return
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(updated)
 

@@ -32,6 +32,18 @@ class ContractStabilityTest(unittest.TestCase):
 
         self.assertEqual(first, second)
 
+    def test_reinjection_of_unchanged_file_does_not_touch_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            destination = Path(tmp) / "CLAUDE.md"
+            self.provider._inject_rules(destination)
+            before = destination.stat().st_mtime_ns
+            # A write with identical bytes still bumps mtime, which is what
+            # Claude Code keys the mid-session re-attach on.
+            self.provider._inject_rules(destination)
+            after = destination.stat().st_mtime_ns
+
+        self.assertEqual(before, after)
+
     def test_injection_preserves_user_content_outside_markers(self):
         user_content = b"# My rules\n\nKeep my stuff.\n"
         with tempfile.TemporaryDirectory() as tmp:
