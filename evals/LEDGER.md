@@ -644,3 +644,37 @@ machine. Everything left needs one of two things from the user:
   `skillOverrides` block (2.3% of the bill), review and commit the dieted
   CLAUDE.md files in trading-lab and swing-trader, restart Claude Code and
   opencode so the squeeze v2 hook and the opencode plugin load.
+
+## Iteration 21 (2026-10-23): effort level on Opus (live bench, user go-ahead)
+
+Hypothesis: `CLAUDE_CODE_EFFORT_LEVEL=low` cuts weighted cost per task by
+>=15% at equal pass rate on Opus 5.5, where thinking is a third of output.
+Arms v2 and v2_low only (if low shows nothing, medium will not), 10 real
+tasks, 2 reps first. Estimate: 40 runs x ~$0.37 (Opus v2_deleg runs
+averaged $0.38) = ~$15 API-equivalent, charged to the Max plan's quota,
+not billed. The earlier "~$12" figure in this ledger was a guess made
+before any Opus run had been priced; 90 runs at 3 arms would be ~$33.
+Command: `python3 evals/bench/run.py v2 v2_low --model claude-opus-5-5 --reps 2 --jobs 4 --tasks <10 real tasks>`.
+
+Result (60 runs, $12.69 API-equivalent on Max quota; cumulative ~$83,
+past the $80 cap, so no further live runs without a word): v2_medium added
+after low came back cheap but broken. Per-task medians, mean over the 10
+real tasks, bootstrap 90% CI on the cost delta (2,000 resamples):
+
+| Arm | Pass | $/task | vs v2 | 90% CI | Output tok/run | Turns | Secs |
+|---|---|---|---|---|---|---|---|
+| v2 | 18/20 | 0.247 | | | 3,844 | 10.0 | 119 |
+| v2_low | 16/20 | 0.168 | -32% | -55% to -13% | 1,998 | 6.5 | 46 |
+| v2_medium | 18/20 | 0.220 | -11% | -24% to +1% | 3,376 | 9.1 | 68 |
+
+Low halves output tokens and cache reads (fewer turns), but
+mistune-table-delimiter-row passed both default reps and failed both low
+reps: revert by the quality rule, even at -32%. Medium keeps 18/20 on the
+same tasks (indexedset still fails everywhere) at -11%, and its CI just
+touches zero, so it is parked as inconclusive, not shipped. Unlike Sonnet
+(iteration 4, no effect), the knob does move Opus: output tokens -12%
+(medium) and -48% (low) per run. Not tested: xhigh, and whether medium's
+loss shows up on harder tasks than this bench has. One more rep per cell
+(~$4.50) would likely close the CI; that is the user's call past the cap.
+Analysis: evals/bench/analyze.py with MODEL=claude-opus-5-5, or the inline
+script in this iteration's transcript (same method).

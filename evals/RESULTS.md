@@ -388,3 +388,12 @@ file are 8.2% of Reads in main sessions but 0.34% of resident token-turns
 token-turns, none of them whole-file reads of files over 2000 lines.
 WebFetch and WebSearch are 1.2% (main) and 5.5% (subagents). A dedupe hook
 is not worth its own prefix cost.
+
+## Effort level on Opus 5.5 (bench, 2026-10-23)
+
+10 real tasks x 2 reps per arm, `claude-opus-5-5`, per-task medians then
+mean, bootstrap 90% CI. `CLAUDE_CODE_EFFORT_LEVEL=low`: -32% cost per task
+(CI -55% to -13%) but pass 16/20 vs 18/20; one task fails only under low.
+Reverted. `medium`: 18/20, -11% (CI -24% to +1%), parked as inconclusive.
+Output tokens per run 3,844 default, 3,376 medium, 1,998 low. The same
+knob did nothing on Sonnet 5.5.
