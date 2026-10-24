@@ -4,7 +4,7 @@ Agent-optimized bounded file inspection.
 
 Replaces raw `cat`/`sed` reads with exact, line-numbered ranges to reduce context usage.
 
-Target: **50–90% less file-content context** when only part of a file is needed.
+Not benchmarked on its own. In the live A/B bench the model never called any `better-*` tool when native Grep, Read and Edit were available ([evals/RESULTS.md](../../evals/RESULTS.md)), so Claude Code no longer registers these as MCP tools; the saving is the bounded, structured output you get when you call it explicitly.
 
 ```bash
 python3 tools/better-cat/better_cat.py src/auth.py:40-80

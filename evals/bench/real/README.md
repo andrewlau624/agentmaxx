@@ -12,6 +12,8 @@ None of the parent suites had failures before any patch was applied, so every `k
 
 Run `python3 verify.py [task_id ...] [--no-regress] [--keep]`.
 
+Results so far (`python3 evals/bench/analyze.py` with `MODEL=claude-opus-5-5`): the shipped setup on Opus 5.5 passes 26/30 at a median $0.215 per task; `boltons-indexedset-slice-after-remove` fails in every arm and `mistune-table-delimiter-row` is flaky. Effort `low` passed 16/20 at −32%, `medium` 26/30 at −1%; Sonnet subagents under an Opus parent passed 8/10 at −22%. Details in [../../LEDGER.md](../../LEDGER.md) iterations 7, 11 and 21.
+
 | task_id | repo | fix sha | files touched | verification |
 |---|---|---|---|---|
 | sqlparse-begin-end-semicolon | sqlparse | 1a3bfbd50b | `sqlparse/engine/statement_splitter.py` | PASS: 1 fail->pass, 1 guard, 480 regress ok |

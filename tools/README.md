@@ -1,6 +1,25 @@
 # Tools
 
-Tools provide optimized interfaces for common agent operations.
+Twenty-one `better-*` CLI tools: ranked search (`better-grep`, `better-explore`), bounded reads
+(`better-cat`, `better-context`), batched edits (`better-edit`), code structure (`better-symbol`,
+`better-trace`, `better-related`, `better-structure`, `better-types`, `better-contract`), git
+(`better-git`, `better-diff`, `better-blame`), checks (`better-test`, `better-lint`,
+`better-check`, `better-error`), listings (`better-find`, `better-tree`) and output compression
+(`better-compress`). Each bounds its output and takes several inputs in one call.
+
+## What the measurements say
+
+- In the live A/B bench ([evals/RESULTS.md](../evals/RESULTS.md)), the model never called a
+  single `better-*` tool when it had native Grep, Read and Edit, and the MCP server connecting
+  after the first request changed the tool list and forced full cache rewrites. The arm that
+  shipped them as MCP tools cost +89% per task. Claude Code therefore no longer registers them;
+  they are listed in the on-demand `better-tools` skill and remain native tools in opencode and
+  Codex.
+- Over 30 days of real sessions, discovery before the first edit took a median of 1 tool call
+  (p90 7; 6% of 819 task episodes needed 10 or more), so a better search tool has little to
+  save on the typical task.
+- No tool is benchmarked on its own. The per-tool READMEs describe what each returns, not a
+  measured saving.
 
 `registry.yaml` is the source of truth for the tool list — every tool directory must have a
 matching entry (enforced by `test_registry.py`). It's also where `agentmaxx init` reads the

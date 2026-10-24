@@ -20,7 +20,7 @@ Returns structured JSON with symbol locations, including file, line number, and 
 
 **Solution:** `better-symbol` returns definitions first, then usages/implementations separately. One call replaces 3-5 grep searches + manual filtering.
 
-**Token savings:** ~150-250 tokens per symbol lookup.
+Not benchmarked on its own. In the live A/B bench the model never called any `better-*` tool when native Grep, Read and Edit were available ([evals/RESULTS.md](../../evals/RESULTS.md)), so Claude Code no longer registers these as MCP tools; the saving is the bounded, structured output you get when you call it explicitly.
 
 ## Kinds
 
