@@ -53,4 +53,4 @@ Countermeasures that actually work: commit to one direction and carry it through
 
 ## With the rest of agentmaxx
 
-Inventory with better-context/better-find (bounded reads), verify assumptions about prop APIs with assumption-check, and let test-first pin interactive behavior.
+Inventory with better-context/better-find (bounded reads), verify assumptions about prop APIs before building on them, and pin interactive behavior with a failing test first.

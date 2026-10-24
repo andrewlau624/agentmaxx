@@ -66,5 +66,8 @@
     ]
    }
   ]
+ },
+ "env": {
+  "AGENTMAXX_VERIFY_COVERAGE": "0"
  }
 }

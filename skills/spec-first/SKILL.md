@@ -38,7 +38,7 @@ Interfaces: routes, CLI flags, function signatures, schema changes.
 Config: new env vars or settings, with defaults, and where each is set in deploy.
 Out of scope: ...
 Verification: how each behavior will be checked (this becomes the /verify-pr claim list).
-Risks: data migrations, breaking changes (see /safe-change), anything irreversible.
+Risks: data migrations, breaking changes, anything irreversible.
 ```
 
 Get a yes before building. Then build against the spec, and when done run `/verify-pr` with the spec's Behavior list as the claims.

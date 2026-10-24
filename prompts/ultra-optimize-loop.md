@@ -127,7 +127,7 @@ If you're running under `/loop` or have ScheduleWakeup, use it to keep going acr
 
 ## No AI tells, anywhere
 
-Any output an agent produces through agentmaxx must not read as AI-made. That covers prose, UI, code, architecture docs, commit messages, and security reports. It is a hard requirement, not taste: every recognizable signal counts. Skills exist (`human-voice`, `design-system-ui`, `reviewer-style`, `code-review`). Audit them, merge the overlap, and make each one enforceable.
+Any output an agent produces through agentmaxx must not read as AI-made. That covers prose, UI, code, architecture docs, commit messages, and security reports. It is a hard requirement, not taste: every recognizable signal counts. Skills exist (`human-voice`, `design-system-ui`; `reviewer-style` and `code-review` are in `skills-optional/`). Audit them, merge the overlap, and make each one enforceable.
 
 ### 1. Catalog
 

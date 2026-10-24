@@ -77,15 +77,27 @@ def is_correction(text: str) -> bool:
     return len(text) < 600 and bool(lessons.CORRECTION.search(IDEATION.sub(" ", text)))
 
 
-def recurrences(corrections: list[tuple[float, str, str]]) -> list[tuple[str, str]]:
-    """(earlier, later) pairs: a correction that repeats one from an earlier session."""
+def _similar(a: set[str], b: set[str]) -> bool:
+    shared = a & b
+    return len(shared) >= 2 and len(shared) / len(a | b) >= 0.4
+
+
+def recurrences(corrections: list[tuple[float, str, str]], within_session: bool = False) -> list[tuple[str, str]]:
+    """(earlier, later) pairs: a correction that repeats an earlier one.
+
+    Default: the earlier one is from another session (a lesson that never
+    stuck). within_session=True: same session, later timestamp, the strongest
+    sign that an injected lesson was ignored (or that none was recorded).
+    """
     pairs = []
     ordered = sorted(corrections)
-    for i, (_, session, text) in enumerate(ordered):
+    for i, (at, session, text) in enumerate(ordered):
         words = keywords(text)
-        for _, prev_session, prev in ordered[:i]:
-            shared = words & keywords(prev)
-            if prev_session != session and len(shared) >= 2 and len(shared) / len(words | keywords(prev)) >= 0.4:
+        for prev_at, prev_session, prev in ordered[:i]:
+            same = prev_session == session
+            if same != within_session or (same and prev_at >= at):
+                continue
+            if _similar(words, keywords(prev)):
                 pairs.append((prev, text))
                 break
     return pairs
@@ -106,7 +118,8 @@ def scan(days: int, root: Path = PROJECTS) -> dict:
             if is_correction(text):
                 weeks[week][0] += 1
                 corrections.append((at, path.stem, text))
-    return {"weeks": dict(sorted(weeks.items())), "corrections": corrections, "repeats": recurrences(corrections)}
+    return {"weeks": dict(sorted(weeks.items())), "corrections": corrections, "repeats": recurrences(corrections),
+            "session_repeats": recurrences(corrections, within_session=True)}
 
 
 def report(stats: dict) -> list[str]:
@@ -119,6 +132,11 @@ def report(stats: dict) -> list[str]:
     lines.append(f"  repeated from an earlier session: {len(repeats)}"
                  + (" (lessons that didn't stick, or were never recorded)" if repeats else ""))
     for prev, later in repeats[:3]:
+        lines.append(f"    \"{later[:90]}\"  ~  \"{prev[:60]}\"")
+    within = stats.get("session_repeats", [])
+    lines.append(f"  repeated within one session: {len(within)}"
+                 + (" (the correction was made and then ignored)" if within else ""))
+    for prev, later in within[:3]:
         lines.append(f"    \"{later[:90]}\"  ~  \"{prev[:60]}\"")
     return lines
 

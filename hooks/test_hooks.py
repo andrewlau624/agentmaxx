@@ -159,6 +159,106 @@ class TestVerify(unittest.TestCase):
         open(f"{d}/cp1252.txt", "wb").write(b"\x93quoted\x94")
         self.assertIsNotNone(verify.tree_fingerprint(d))
 
+    PY_SRC = (
+        "import os\n\nclass Ledger:\n    def __init__(self):\n        self.rows = []\n\n"
+        "    def compute_total(self, rows):\n        total = 0\n        for r in rows:\n            total += r\n        return total\n\n"
+        "def run(x):\n    return x\n\n\ndef load_config(path):\n    return open(path).read()\n"
+    )
+    TS_SRC = (
+        "export async function fetchUsers(api: Api): Promise<User[]> {\n  const res = await api.get('/u');\n  return res.json();\n}\n\n"
+        "export const parseRow = (line: string): Row => {\n  const cells = line.split(',');\n  return { cells };\n};\n\n"
+        "class Store {\n  private cache = new Map();\n  async refreshCache(): Promise<void> {\n    if (this.cache.size) {\n      this.cache.clear();\n    }\n  }\n}\n"
+    )
+
+    def test_symbols_at_python(self):
+        self.assertEqual(verify.symbols_at(self.PY_SRC, {10}), ["Ledger", "compute_total"])  # inside the method body
+        self.assertEqual(verify.symbols_at(self.PY_SRC, {18}), ["load_config"])
+        self.assertEqual(verify.symbols_at(self.PY_SRC, {14}), [])  # `run` is short and a stopword
+        self.assertEqual(verify.symbols_at(self.PY_SRC, {1}), [])  # module-level import
+
+    def test_symbols_at_typescript(self):
+        self.assertEqual(verify.symbols_at(self.TS_SRC, {2}), ["fetchUsers"])
+        self.assertEqual(verify.symbols_at(self.TS_SRC, {7}), ["parseRow"])
+        self.assertEqual(verify.symbols_at(self.TS_SRC, {15}), ["Store", "refreshCache"])  # `if (...) {` is not a symbol
+
+    def _repo(self, files):
+        import tempfile, subprocess
+        d = tempfile.mkdtemp()
+        for rel, body in files.items():
+            os.makedirs(os.path.dirname(os.path.join(d, rel)) or d, exist_ok=True)
+            open(os.path.join(d, rel), "w").write(body)
+        subprocess.run("git init -q && git add . && git -c user.name=t -c user.email=t@t commit -q -m x",
+                       shell=True, cwd=d, check=True)
+        return d
+
+    LIB = "def compute_total(rows):\n    total = 0\n    for r in rows:\n        total += r\n    return total\n"
+    LIB_EDITED = "def compute_total(rows):\n    total = 0\n    for r in rows:\n        total += r * 2\n    return total\n"
+    APP = "from lib import compute_total\n\ndef report(rows):\n    return compute_total(rows)\n"
+
+    def test_coverage_gaps_caller_without_test(self):
+        d = self._repo({"lib.py": self.LIB, "app.py": self.APP})
+        self.assertEqual(verify.coverage_gaps(d), [])  # nothing changed yet
+        open(os.path.join(d, "lib.py"), "w").write(self.LIB_EDITED)
+        self.assertEqual(verify.coverage_gaps(d), ["compute_total (called from app.py:1, app.py:4)"])
+        os.makedirs(os.path.join(d, "tests"))
+        open(os.path.join(d, "tests", "test_lib.py"), "w").write("from lib import compute_total\n\ndef test_it():\n    assert compute_total([1]) == 2\n")
+        self.assertEqual(verify.coverage_gaps(d), [])  # an untracked test naming the symbol counts
+
+    def test_coverage_gaps_no_callers_is_quiet(self):
+        d = self._repo({"lib.py": self.LIB})
+        open(os.path.join(d, "lib.py"), "w").write(self.LIB_EDITED)
+        self.assertEqual(verify.coverage_gaps(d), [])
+
+    def test_coverage_note_once_per_session_and_opt_out(self):
+        import tempfile
+        d = self._repo({"lib.py": self.LIB, "app.py": self.APP})
+        open(os.path.join(d, "lib.py"), "w").write(self.LIB_EDITED)
+        old_state, verify.STATE = verify.STATE, tempfile.mkdtemp()
+        try:
+            os.environ["AGENTMAXX_VERIFY_COVERAGE"] = "0"
+            self.assertIsNone(verify.coverage_note(d, "s1"))
+            del os.environ["AGENTMAXX_VERIFY_COVERAGE"]
+            note = verify.coverage_note(d, "s1")
+            self.assertIn("compute_total (called from app.py:1, app.py:4)", note)
+            self.assertIn("which of these you exercised", note)
+            self.assertIsNone(verify.coverage_note(d, "s1"))  # once per session
+            self.assertIsNotNone(verify.coverage_note(d, "s2"))
+        finally:
+            verify.STATE = old_state
+            os.environ.pop("AGENTMAXX_VERIFY_COVERAGE", None)
+
+    def _stop(self, d, lib_body):
+        import io, contextlib, tempfile
+        open(os.path.join(d, "lib.py"), "w").write(lib_body)
+        transcript = os.path.join(tempfile.mkdtemp(), "t.jsonl")
+        open(transcript, "w").write(json.dumps({"message": {"content": [{"type": "tool_use", "name": "Edit", "input": {}}]}}) + "\n")
+        old_state, verify.STATE = verify.STATE, tempfile.mkdtemp()
+        os.environ["AGENTMAXX_VERIFY_CMD"] = "true"
+        event = {"hook_event_name": "Stop", "cwd": d, "session_id": "s1", "transcript_path": transcript}
+        out = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out), unittest.mock.patch("sys.stdin", io.StringIO(json.dumps(event))):
+                verify.main()
+        finally:
+            verify.STATE = old_state
+            del os.environ["AGENTMAXX_VERIFY_CMD"]
+        return json.loads(out.getvalue())
+
+    def test_stop_emits_coverage_as_additional_context_when_allowing(self):
+        d = self._repo({"lib.py": self.LIB, "app.py": self.APP})
+        res = self._stop(d, self.LIB_EDITED)
+        self.assertNotIn("decision", res)
+        self.assertEqual(res["hookSpecificOutput"]["hookEventName"], "Stop")
+        self.assertIn("compute_total (called from app.py:1, app.py:4)", res["hookSpecificOutput"]["additionalContext"])
+
+    def test_stop_appends_coverage_note_to_block_reason(self):
+        d = self._repo({"lib.py": self.LIB, "app.py": self.APP})
+        res = self._stop(d, self.LIB_EDITED.replace("total += r * 2", "total += r * 2  # noqa"))
+        self.assertEqual(res["decision"], "block")
+        self.assertIn("lib.py:4 blanket suppression", res["reason"])
+        self.assertIn("no test coverage: compute_total (called from app.py:1, app.py:4)", res["reason"])
+        self.assertNotIn("hookSpecificOutput", res)
+
 
 class TestRatchet(unittest.TestCase):
     def repo(self, files):

@@ -34,6 +34,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 TIMEOUT = int(os.environ.get("AGENTMAXX_VERIFY_TIMEOUT", "120"))
@@ -66,6 +67,26 @@ ASSERTION = re.compile(r"^\s*(assert\b|self\.assert\w*\(|expect\(|t\.(Error|Fata
 STRING_LITERAL = re.compile(r"""("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)""")
 CODE_FILE = re.compile(r"\.(py|pyi|js|jsx|ts|tsx|mjs|cjs|go|rs|java|kt|rb|php|cs|swift|c|cc|cpp|h|hpp)$")
 TEST_FILE = re.compile(r"(^|/)(tests?/|test_[^/]*$|[^/]*_test\.\w+$|[^/]*\.(test|spec)\.\w+$)")
+
+# Coverage note: a passing suite that never reaches the changed code is the usual shape of a
+# false "done" (2 of 2 in the last 30 days), so after the gate we name changed symbols that have
+# callers but no test file mentioning them. Cheap regexes, one git grep per symbol, time-boxed.
+COVERAGE_BUDGET = float(os.environ.get("AGENTMAXX_VERIFY_COVERAGE_BUDGET", "3"))
+COVERAGE_MAX_SYMBOLS, COVERAGE_MAX_HITS, COVERAGE_MAX_FILE_LINES = 15, 20, 400
+COVERAGE_STOPWORDS = {
+    "main", "test", "tests", "run", "get", "set", "init", "new", "self", "this", "setup", "teardown",
+    "render", "handler", "handle", "update", "create", "delete", "index", "default", "constructor",
+    "if", "for", "while", "switch", "catch", "return", "function", "else", "match", "loop",
+}
+SPEC_FILE = re.compile(r"(^|/)(__tests__|spec|__mocks__|fixtures?)/")
+SYMBOL_DEF = re.compile(
+    r"^\s*(?:export\s+)?(?:default\s+)?(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?"
+    r"(?:(?:def|class|function\*?|fn|struct|enum|trait|interface|module)\s+(?:self\.)?([A-Za-z_]\w*)"      # py/js/ts/rs/rb
+    r"|func\s+(?:\([^)]*\)\s*)?([A-Za-z_]\w*)"                                                               # go
+    r"|type\s+([A-Za-z_]\w*)\s+(?:struct|interface)\b"                                                       # go types
+    r"|(?:const|let|var)\s+([A-Za-z_]\w*)\s*(?::[^=]*)?=\s*(?:async\s*)?(?:\([^)]*\)\s*(?::\s*[^=]+)?\s*=>|[A-Za-z_]\w*\s*=>|function\b)"  # arrows
+    r"|(?:(?:public|private|protected|static|async|override|readonly)\s+)*([A-Za-z_]\w*)\s*\([^)]*\)\s*(?::\s*[^{=;]+)?\{\s*$)"  # ts/java methods
+)
 
 
 def diff_lines(cwd: str) -> tuple[list[tuple[str, int, str]], dict[str, int]] | None:
@@ -139,6 +160,107 @@ def cheat_findings(cwd: str, baseline: set[str] | None = None) -> list[str] | No
 def cheat_keys(findings: list[str]) -> list[str]:
     """Line-number-free keys, so a baseline still matches after lines shift."""
     return [re.sub(r"^([^:]+):\d+ ", r"\1: ", f) for f in findings]
+
+
+def symbols_at(text: str, lines: set[int]) -> list[str]:
+    """Names of the definitions (function, method, class) whose body contains any of `lines`,
+    by indentation: a definition encloses what follows until a non-blank line at or left of it."""
+    stack: list[tuple[int, str]] = []
+    found: list[str] = []
+    for no, line in enumerate(text.splitlines(), 1):
+        if not line.strip():
+            continue
+        indent = len(line) - len(line.lstrip())
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        m = SYMBOL_DEF.match(line)
+        if m:
+            name = next(g for g in m.groups() if g).rstrip("?!")
+            if len(name) >= 4 and name.lower() not in COVERAGE_STOPWORDS:
+                stack.append((indent, name))
+        if no in lines:
+            for _, name in stack:
+                if name not in found:
+                    found.append(name)
+    return found
+
+
+def changed_symbols(cwd: str, added: list[tuple[str, int, str]]) -> dict[str, set[str]]:
+    """symbol -> files defining it, for non-test code files with under COVERAGE_MAX_FILE_LINES changes."""
+    by_file: dict[str, set[int]] = {}
+    for path, no, _ in added:
+        if CODE_FILE.search(path) and not TEST_FILE.search(path) and not SPEC_FILE.search(path):
+            by_file.setdefault(path, set()).add(no)
+    out: dict[str, set[str]] = {}
+    for path, nos in by_file.items():
+        if len(nos) >= COVERAGE_MAX_FILE_LINES:
+            continue
+        try:
+            with open(os.path.join(cwd, path), errors="replace") as fh:
+                text = fh.read(400_000)
+        except OSError:
+            continue
+        for name in symbols_at(text, nos):
+            out.setdefault(name, set()).add(path)
+            if len(out) >= COVERAGE_MAX_SYMBOLS:
+                return out
+    return out
+
+
+def coverage_gaps(cwd: str, budget: float = COVERAGE_BUDGET) -> list[str]:
+    """Changed symbols with callers outside the edited files and no test file naming them,
+    as "sym (called from a.py:12, b.py:40)". Each git grep gets what is left of `budget`."""
+    lines = diff_lines(cwd)
+    if lines is None:
+        return []
+    added, _ = lines
+    edited = {path for path, _, _ in added}
+    deadline = time.monotonic() + budget
+    gaps = []
+    for name, defs in changed_symbols(cwd, added).items():
+        left = deadline - time.monotonic()
+        if left <= 0:
+            break
+        try:
+            proc = subprocess.run(["git", "grep", "-n", "-w", "-I", "--untracked", "-e", name, "--", "."],
+                                  cwd=cwd, capture_output=True, text=True, errors="replace", timeout=left)
+        except (OSError, subprocess.TimeoutExpired):
+            break
+        callers, tested = [], False
+        for hit in proc.stdout.splitlines():
+            path, _, rest = hit.partition(":")
+            line_no, _, text = rest.partition(":")
+            if not CODE_FILE.search(path):
+                continue
+            if TEST_FILE.search(path) or SPEC_FILE.search(path):
+                tested = True
+                break
+            if path in edited or path in defs or SYMBOL_DEF.match(text):
+                continue
+            if re.match(r"\s*(#|//|/?\*)", text) or not re.search(rf"\b{name}\b", STRING_LITERAL.sub('""', text)):
+                continue  # named in a comment or a string, not called
+            if len(callers) < COVERAGE_MAX_HITS:
+                callers.append(f"{path}:{line_no}")
+        if callers and not tested:
+            shown = ", ".join(callers[:3]) + (f", +{len(callers) - 3} more" if len(callers) > 3 else "")
+            gaps.append(f"{name} (called from {shown})")
+    return gaps
+
+
+def coverage_note(cwd: str, sid: str) -> str | None:
+    """One note per session, or None. Disabled with AGENTMAXX_VERIFY_COVERAGE=0."""
+    if os.environ.get("AGENTMAXX_VERIFY_COVERAGE") == "0":
+        return None
+    marker = baseline_path(sid) + ".coverage"
+    if os.path.exists(marker):
+        return None
+    gaps = coverage_gaps(cwd)
+    if not gaps:
+        return None
+    os.makedirs(STATE, exist_ok=True)
+    open(marker, "w").close()
+    return ("agentmaxx verify: changed symbols with callers but no test coverage: " + "; ".join(gaps)
+            + ". Say explicitly which of these you exercised and which you did not.")
 
 
 def edited_this_session(transcript_path: str) -> bool:
@@ -297,9 +419,12 @@ def main() -> int:
             problems.append(test_problem)
         if notice:
             notices.append(notice)
+    note = coverage_note(cwd, sid) if (not command or (result is not None and result[0] == 0)) else None
     out: dict = {}
     if problems:
-        out = {"decision": "block", "reason": "\n\n".join(problems)}
+        out = {"decision": "block", "reason": "\n\n".join(problems + ([note] if note else []))}
+    elif note:
+        out["hookSpecificOutput"] = {"hookEventName": "Stop", "additionalContext": note}
     if notices:
         out["systemMessage"] = " ".join(notices)
     if out:

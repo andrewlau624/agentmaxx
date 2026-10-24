@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
 import re
+import os
 import shutil
 
 
@@ -153,8 +154,13 @@ class Provider(ABC):
             self.source_root / "skills",
             self.global_root / "skills",
         )
-        for skill in (self.source_root / "skills").glob("*/SKILL.md"):
-            installed = self.global_root / "skills" / skill.parent.name / "SKILL.md"
+        # skills-optional/ holds skills the transcripts showed never fire;
+        # they still install on request so nothing is lost.
+        optional = self.source_root / "skills-optional"
+        if os.environ.get("AGENTMAXX_OPTIONAL_SKILLS") == "1" and optional.is_dir():
+            self._copy_directory(optional, self.global_root / "skills")
+        for skill in (self.global_root / "skills").glob("*/SKILL.md"):
+            installed = skill
             text = installed.read_text()
             if TOOLS_ROOT_PLACEHOLDER in text:
                 installed.write_text(text.replace(TOOLS_ROOT_PLACEHOLDER, str(self.tools_root)))

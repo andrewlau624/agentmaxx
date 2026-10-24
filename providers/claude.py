@@ -26,6 +26,11 @@ HOOKS = [
     ("Stop", None, "verify.py", "", 180),
     ("SessionStart", None, "lessons.py", " hook session-start", 10),
     ("UserPromptSubmit", None, "lessons.py", " hook prompt", 10),
+    # quality hooks (evals/quality-research.md)
+    ("UserPromptSubmit", None, "prompt_guard.py", "", 10),
+    ("PreToolUse", "WebSearch|WebFetch", "research_log.py", "", 10),
+    ("PostToolUseFailure", "Bash|Edit|Write|MultiEdit", "lessons.py", " hook failure", 10),
+    ("Stop", None, "review.py", "", 200),
 ]
 HOOK_MARKER = "/agentmaxx/hooks/"
 

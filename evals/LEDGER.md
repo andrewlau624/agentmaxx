@@ -723,3 +723,46 @@ what agentmaxx and the user's settings trade away for cost:
   remaining quality trade and lives outside agentmaxx.
 - Verify gate: autodetects pytest/unittest in all three research repos
   (`verify.detect`), so the "blind in research repos" worry was wrong.
+
+## Iteration 23 (2026-10-23): smarter sessions, fewer loops (research + build)
+
+Research in `evals/quality-research.md`: a 30-day transcript mine (151 real
+sessions) plus the 2024-2026 literature. Headline: zero command-level loops;
+the "stuck" is a research conclusion loop ("nothing passes" 59 turns vs
+"keep going" 66 replies), 70% of research sessions never searched for
+counter-evidence, swing-trader re-searched 12% of queries across sessions,
+misreading short prompts was the top correction type (23/68), and the quality
+skills had 0 invocations. User approved all five directions; built in
+parallel with disjoint file ownership:
+
+- `hooks/research_log.py` + `skills/research/SKILL.md`. Per-repo query log;
+  near-duplicate WebSearch denied once (Jaccard >= 0.8 same session, >= 0.6
+  cross-session, exempt when the query adds a pivot word like reddit/paper/
+  fails). Replay over 530 real queries: 10 denied (2%), 8 real repeats, 2
+  borderline. Skill: sufficiency criteria first, hypothesis-space matrix,
+  disconfirming query + source pivot, "retrieved but unasked", stop rule.
+- `hooks/prompt_guard.py` (UserPromptSubmit). Misread line on short prompts
+  with a correction opener, bare deictic, 2+ typos, or 4-8 content-free
+  words; assumption line on implementation prompts with 2+ unknowns. Replay:
+  misread 17.7%, assumption 2.2% of 1,886 prompts; 3 of 4 known misread
+  antecedents would have fired. Each line ~210 chars.
+- `hooks/review.py` (Stop). Fresh-context `claude -p` reviewer (sonnet),
+  task + diff only, correctness gaps only, blocks once per session, never on
+  reviewer failure, skips headless (`CLAUDE_CODE_ENTRYPOINT=sdk-cli`). Smoke:
+  caught a real empty-input bug, 6 s, $0.019. FP rate on sound diffs unmeasured.
+- `hooks/lessons.py` v2. Correction regex on a 73-prompt labelled set:
+  P 67% -> 91%, R 58% -> 96% (in-sample). Within-session repeat count in
+  `corrections.py`. Lessons carry an evidence snippet of the corrected
+  message (never injected). `hook failure` (PostToolUseFailure) injects 1-3
+  word-matching lessons once per session.
+- `hooks/verify.py` coverage note: changed symbols with callers but no test
+  mention, once, non-blocking (appended to the block reason when blocking).
+  Pinned off in the v2 bench arms so cost numbers stay comparable.
+- Skills with 0 uses moved to `skills-optional/` (assumption-check, explore,
+  test-first, code-review, reviewer-style, safe-change, teach-me,
+  context-handoff); `AGENTMAXX_OPTIONAL_SKILLS=1 make install` restores.
+
+`make test`: 255 + 49 + 97 OK. Not yet measured live: the Direction 1
+metrics (families per research-day, counter-evidence share, re-search rate,
+"nothing passes" pairs) and the reviewer's false-positive rate; both need
+30 days of transcripts after install, per the plan in quality-research.md.
